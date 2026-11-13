@@ -1,0 +1,8 @@
+# Versions à épingler (==) une fois que tout fonctionne : pip freeze
+langgraph
+langchain-groq
+langchain-mcp-adapters
+mcp
+python-dotenv
+google-api-python-client
+google-auth-oauthlib
