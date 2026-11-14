@@ -174,7 +174,7 @@ python serveur_mcp/serveur.py http        # transport HTTP : http://127.0.0.1:80
 
 | Argument | Type | Exemple | Sens |
 |---|---|---|---|
-| `quartier` | texte | `"Mermoz"` | quartier de Dakar (nom exact, majuscules indifférentes) |
+| `quartier` | texte | `"Mermoz"` | quartier de Dakar (accents et majuscules indifférents ; une partie du nom suffit) |
 | `type_bien` | texte | `"appartement"` | `studio`, `appartement`, `villa` ou `chambre` |
 | `pieces` | entier | `3` | nombre de pièces exact (F3 = 3) |
 | `loyer_max` | entier | `400000` | loyer mensuel maximum en F CFA, sans espace |
@@ -186,9 +186,12 @@ Réponse :
 ```json
 {"nombre": 1, "biens": [{"id": "SK-001", "type": "appartement", "quartier": "Mermoz",
   "adresse": "Rue MZ-12, Villa 45, Mermoz", "pieces": 3, "loyer": 350000,
-  "meuble": false, "disponible": true, "disponible_le": "2026-11-20"}]}
+  "meuble": false, "disponible": true, "disponible_le": "2026-11-20"}],
+ "message": "1 bien(s) trouvé(s)."}
 ```
-Si `nombre` vaut `0`, aucun bien ne correspond : l'agent doit le dire au client, sans rien inventer.
+Les biens sont triés du moins cher au plus cher ; au-delà de 5 résultats, seuls les moins chers sont affichés.
+Si rien ne correspond : `{"nombre": 0, "biens": [], "message": "Aucun bien disponible ne correspond à ces critères dans le catalogue."}` : l'agent doit le dire au client, sans rien inventer.
+Argument invalide (ex. `type_bien="maison"`) : `{"erreur": "type_bien « maison » inconnu.", "conseil": "Utiliser une de ces valeurs : ..."}`.
 
 **`detail_bien`** : donne la fiche complète d'un bien.
 
@@ -196,10 +199,11 @@ Si `nombre` vaut `0`, aucun bien ne correspond : l'agent doit le dire au client,
 |---|---|---|---|
 | `id_bien` | texte | `"SK-008"` | identifiant renvoyé par `rechercher_biens` (SK-001 à SK-030) |
 
-Exemple d'appel : `detail_bien(id_bien="SK-008")` → la fiche du bien (quartier Point E, 3 pièces, 500 000 F…).
-Identifiant inconnu : `{"erreur": "Aucun bien avec l'identifiant SK-999. Les identifiants vont de SK-001 à SK-030."}`
+Exemple d'appel : `detail_bien(id_bien="SK-008")` → `{"bien": {"id": "SK-008", "quartier": "Point E", "pieces": 3, "loyer": 500000, ...}}`
+Identifiant inconnu : `{"erreur": "Aucun bien SK-999 dans le catalogue.", "conseil": "Ne pas inventer de bien : relancer rechercher_biens."}`
+Identifiant mal formé (ex. `"12"`) : `{"erreur": "Identifiant « 12 » mal formé.", "conseil": "..."}`
 
-En cas de base absente ou illisible, les deux outils renvoient `{"erreur": "Catalogue indisponible : ..."}` au lieu de planter.
+En cas de base absente ou illisible, les deux outils renvoient `{"erreur": "Catalogue inaccessible : ...", "conseil": "..."}` au lieu de planter.
 
 ### Ressource (information à lire, sans action)
 
@@ -255,7 +259,7 @@ Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 - [x] Vérifier le serveur avec l'inspecteur MCP, en local puis en HTTP
 - [x] Connecter l'agent au serveur comme client MCP et supprimer les fonctions locales de l'exercice 1
 - [x] Captures et compte rendu des tests : [docs/tests_serveur_mcp.md](docs/tests_serveur_mcp.md)
-- [ ] Rejouer les 10 demandes de l'exercice 1 via MCP et retrouver les mêmes résultats
+- [x] Rejouer les 10 demandes de l'exercice 1 via MCP et retrouver les mêmes résultats
 - [x] Documenter le serveur dans ce README : outils, arguments, exemples d'appel
 
 **Critère :** les dix demandes de l'exercice 1 donnent les mêmes résultats, et une autre équipe branche son agent sur notre serveur avec notre seule documentation.
