@@ -27,7 +27,7 @@ Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il 
 |---|---|
 | Maimouna Diallo | `Mayra-99` |
 | Serigne Fallou Mbaye | `<À COMPLÉTER>` |
-| Atou Diagne | `<À COMPLÉTER>` |
+| Atou Diagne | `Atou-D10` |
 
 Nous réalisons **tous les exercices ensemble**, pour que chacun comprenne l'ensemble du pipeline.
 
@@ -154,6 +154,70 @@ python evaluation/evaluer.py            # rejouer les tests, tableau de résulta
 ```
 
 ---
+## Serveur MCP du catalogue
+
+Le serveur `serveur_mcp/serveur.py` est le **guichet du catalogue** : n'importe quel agent compatible MCP peut s'y brancher pour chercher des biens, sans connaître notre base SQLite. Il est écrit avec **FastMCP** (paquet `mcp`, version 1 : `pip install "mcp<2"`).
+
+### Lancer le serveur
+
+```
+python serveur_mcp/creer_catalogue.py     # une fois : crée la base catalogue.db (30 biens)
+python serveur_mcp/serveur.py             # transport stdio : l'agent lance le serveur lui-même
+python serveur_mcp/serveur.py http        # transport HTTP : http://127.0.0.1:8000/mcp
+```
+
+### Outils (actions que le modèle peut appeler)
+
+**`rechercher_biens`** : cherche les biens **encore libres** qui correspondent au besoin du client. Tous les arguments sont facultatifs ; on ne remplit que ceux donnés par le client.
+
+| Argument | Type | Exemple | Sens |
+|---|---|---|---|
+| `quartier` | texte | `"Mermoz"` | quartier de Dakar (nom exact, majuscules indifférentes) |
+| `type_bien` | texte | `"appartement"` | `studio`, `appartement`, `villa` ou `chambre` |
+| `pieces` | entier | `3` | nombre de pièces exact (F3 = 3) |
+| `loyer_max` | entier | `400000` | loyer mensuel maximum en F CFA, sans espace |
+| `meuble` | booléen | `true` | `true` = meublé, `false` = non meublé |
+
+Exemple d'appel : `rechercher_biens(quartier="Mermoz", pieces=3, loyer_max=400000)`
+
+Réponse :
+```json
+{"nombre": 1, "biens": [{"id": "SK-001", "type": "appartement", "quartier": "Mermoz",
+  "adresse": "Rue MZ-12, Villa 45, Mermoz", "pieces": 3, "loyer": 350000,
+  "meuble": false, "disponible": true, "disponible_le": "2026-11-20"}]}
+```
+Si `nombre` vaut `0`, aucun bien ne correspond : l'agent doit le dire au client, sans rien inventer.
+
+**`detail_bien`** : donne la fiche complète d'un bien.
+
+| Argument | Type | Exemple | Sens |
+|---|---|---|---|
+| `id_bien` | texte | `"SK-008"` | identifiant renvoyé par `rechercher_biens` (SK-001 à SK-030) |
+
+Exemple d'appel : `detail_bien(id_bien="SK-008")` → la fiche du bien (quartier Point E, 3 pièces, 500 000 F…).
+Identifiant inconnu : `{"erreur": "Aucun bien avec l'identifiant SK-999. Les identifiants vont de SK-001 à SK-030."}`
+
+En cas de base absente ou illisible, les deux outils renvoient `{"erreur": "Catalogue indisponible : ..."}` au lieu de planter.
+
+### Ressource (information à lire, sans action)
+
+| URI | Contenu |
+|---|---|
+| `agence://infos` | horaires de visite (lundi-samedi, 9h-18h, visites de 45 min, fuseau Africa/Dakar), 17 quartiers couverts, conditions de location (caution, avance, frais d'agence, pièces à fournir, durée du bail) |
+
+### Brancher un autre agent sur notre serveur
+
+Vérification rapide avec notre client de test : `python serveur_mcp/verifier_ressource.py` (liste les outils et la ressource, puis lit `agence://infos`).
+
+Depuis un agent LangGraph, avec `langchain-mcp-adapters` :
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+client = MultiServerMCPClient({
+    "catalogue": {"url": "http://127.0.0.1:8000/mcp", "transport": "streamable_http"}
+})
+outils = await client.get_tools()   # -> rechercher_biens, detail_bien
+```
 
 ## 7. Travail à faire, de A à Z
 
@@ -170,13 +234,13 @@ Chaque exercice ajoute une brique et se termine par un **critère d'acceptation*
 
 Pilote : Maimouna · Copilote : Serigne Fallou · Vérificateur : Atou
 
-- [ ] Écrire les 30 biens fictifs : type, quartier, loyer en F CFA, nombre de pièces, adresse, disponibilité
-- [ ] Script qui crée la base SQLite du catalogue
-- [ ] Outils `rechercher_biens` et `detail_bien` : arguments typés, description pour le modèle, erreurs claires
-- [ ] Prompt système : répondre uniquement avec le catalogue, dire clairement quand rien ne correspond
-- [ ] Brancher les outils sur le modèle ; régler le nombre maximal d'étapes et la conduite en cas d'erreur d'outil
-- [ ] Activer les traces : on y lit chaque appel d'outil, ses arguments et son résultat
-- [ ] Écrire et passer les 10 demandes de test
+- [x] Écrire les 30 biens fictifs : type, quartier, loyer en F CFA, nombre de pièces, adresse, disponibilité
+- [x] Script qui crée la base SQLite du catalogue
+- [x] Outils `rechercher_biens` et `detail_bien` : arguments typés, description pour le modèle, erreurs claires
+- [x] Prompt système : répondre uniquement avec le catalogue, dire clairement quand rien ne correspond
+- [x] Brancher les outils sur le modèle ; régler le nombre maximal d'étapes et la conduite en cas d'erreur d'outil
+- [x] Activer les traces : on y lit chaque appel d'outil, ses arguments et son résultat
+- [x] Écrire et passer les 10 demandes de test
 
 **Critère :** sur dix demandes du type « un F3 à Mermoz à moins de 400 000 F », l'agent ne cite que des biens de la base et dit clairement quand aucun bien ne correspond.
 
@@ -184,11 +248,11 @@ Pilote : Maimouna · Copilote : Serigne Fallou · Vérificateur : Atou
 
 Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 
-- [ ] Serveur MCP (FastMCP) qui expose `rechercher_biens` et `detail_bien`
-- [ ] Ressource « agence » : horaires de visite, zones couvertes, conditions de location
+- [x] Serveur MCP (FastMCP) qui expose `rechercher_biens` et `detail_bien`
+- [x] Ressource « agence » : horaires de visite, zones couvertes, conditions de location
 - [ ] Vérifier le serveur avec l'inspecteur MCP, en local puis en HTTP
 - [ ] Connecter l'agent au serveur comme client MCP et supprimer les fonctions locales de l'exercice 1
-- [ ] Documenter le serveur dans ce README : outils, arguments, exemples d'appel
+- [x] Documenter le serveur dans ce README : outils, arguments, exemples d'appel
 
 **Critère :** les dix demandes de l'exercice 1 donnent les mêmes résultats, et une autre équipe branche son agent sur notre serveur avec notre seule documentation.
 
