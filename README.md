@@ -105,6 +105,8 @@ Les dossiers contiennent pour l'instant un fichier vide `.gitkeep` : Git n'enreg
 ### Prérequis
 
 - Python 3.11 ou plus récent, Git, VS Code
+- Node.js 22 ou plus récent, seulement pour l'inspecteur MCP : https://nodejs.org
+  (désinstaller l'ancienne version avant, sinon npm peut casser)
 - Le compte Google **de test** de l'équipe (jamais un compte personnel)
 - La clé API Groq de l'équipe : https://console.groq.com/keys
 
@@ -250,8 +252,10 @@ Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 
 - [x] Serveur MCP (FastMCP) qui expose `rechercher_biens` et `detail_bien`
 - [x] Ressource « agence » : horaires de visite, zones couvertes, conditions de location
-- [ ] Vérifier le serveur avec l'inspecteur MCP, en local puis en HTTP
-- [ ] Connecter l'agent au serveur comme client MCP et supprimer les fonctions locales de l'exercice 1
+- [x] Vérifier le serveur avec l'inspecteur MCP, en local puis en HTTP
+- [x] Connecter l'agent au serveur comme client MCP et supprimer les fonctions locales de l'exercice 1
+- [x] Captures et compte rendu des tests : [docs/tests_serveur_mcp.md](docs/tests_serveur_mcp.md)
+- [ ] Rejouer les 10 demandes de l'exercice 1 via MCP et retrouver les mêmes résultats
 - [x] Documenter le serveur dans ce README : outils, arguments, exemples d'appel
 
 **Critère :** les dix demandes de l'exercice 1 donnent les mêmes résultats, et une autre équipe branche son agent sur notre serveur avec notre seule documentation.
