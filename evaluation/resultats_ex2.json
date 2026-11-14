@@ -1,0 +1,117 @@
+[
+  {
+    "id": 1,
+    "demande": "Je cherche un F3 à Mermoz à moins de 400 000 F par mois.",
+    "attendu": "biens",
+    "ids_attendus": [
+      "SK-001"
+    ],
+    "pourquoi": "SK-002 est aussi un F3 à Mermoz mais coûte 450 000 F : il ne doit PAS être cité.",
+    "reponse": "Voici le bien correspondant à votre recherche :\n\n- **Identifiant** : SK-001  \n- **Type** : appartement  \n- **Quartier** : Mermoz  \n- **Nombre de pièces** : 3 (F3)  \n- **Loyer mensuel** : 350 000 F CFA  \n- **Date d’entrée disponible** : 20 novembre 2026  \n\nSouhaitez‑vous plus d’informations ou planifier une visite ?",
+    "reussi": true,
+    "explication": "cite ['SK-001']"
+  },
+  {
+    "id": 2,
+    "demande": "Bonjour, avez-vous un studio à Ngor ?",
+    "attendu": "biens",
+    "ids_attendus": [
+      "SK-012"
+    ],
+    "pourquoi": "Un seul studio à Ngor.",
+    "reponse": "Oui, nous avons un studio disponible à Ngor :\n\n- **Identifiant** : SK-012  \n- **Type** : studio  \n- **Quartier** : Ngor  \n- **Pièces** : 1  \n- **Loyer** : 200 000 F CFA / mois  \n- **Date d’entrée** : 17 novembre 2026  \n\nN’hésitez pas à me dire si ce bien vous intéresse ou si vous avez d’autres critères.",
+    "reussi": true,
+    "explication": "cite ['SK-012']"
+  },
+  {
+    "id": 3,
+    "demande": "Un appartement de 2 pièces à Ouakam, budget 250 000 F maximum.",
+    "attendu": "biens",
+    "ids_attendus": [
+      "SK-014"
+    ],
+    "pourquoi": "SK-015 est à Ouakam mais a 3 pièces.",
+    "reponse": "Voici le bien correspondant à votre recherche :\n\n- **Identifiant** : SK-014  \n- **Type** : appartement  \n- **Quartier** : Ouakam  \n- **Nombre de pièces** : 2  \n- **Loyer mensuel** : 220 000 F CFA  \n- **Date d’entrée** : 22 novembre 2026  \n\nN’hésitez pas à me dire si ce logement vous intéresse ou si vous souhaitez d’autres critères.",
+    "reussi": true,
+    "explication": "cite ['SK-014']"
+  },
+  {
+    "id": 4,
+    "demande": "Je veux une villa aux Almadies.",
+    "attendu": "biens",
+    "ids_attendus": [
+      "SK-010"
+    ],
+    "pourquoi": "SK-011 est aux Almadies mais c'est un appartement.",
+    "reponse": "Voici le bien correspondant à votre recherche :\n\n- **Identifiant** : SK-010  \n- **Type** : villa  \n- **Quartier** : Almadies  \n- **Nombre de pièces** : 5  \n- **Loyer mensuel** : 2 000 000 F CFA  \n- **Date d’entrée disponible** : 1 décembre 2026  \n\nSouhaitez‑vous plus d’informations sur ce bien ou que je recherche d’autres options ?",
+    "reussi": true,
+    "explication": "cite ['SK-010']"
+  },
+  {
+    "id": 5,
+    "demande": "Quels biens sont disponibles aux Parcelles Assainies ?",
+    "attendu": "biens",
+    "ids_attendus": [
+      "SK-025",
+      "SK-027"
+    ],
+    "pourquoi": "SK-026 est déjà loué : il ne doit PAS être cité.",
+    "reponse": "Voici les biens disponibles dans le quartier **Parcelles Assainies** :\n\n| Identifiant | Type       | Pièces | Loyer mensuel | Date d’entrée |\n|-------------|------------|--------|---------------|----------------|\n| **SK-027**  | studio     | 1      | 80 000 F CFA  | 16 nov. 2026 |\n| **SK-025**  | appartement| 3      | 170 000 F CFA | 20 nov. 2026 |\n\nN’hésitez pas à me dire si l’un de ces logements vous intéresse ou si vous avez d’autres critères.",
+    "reussi": true,
+    "explication": "cite ['SK-025', 'SK-027']"
+  },
+  {
+    "id": 6,
+    "demande": "Pouvez-vous me donner le détail du bien SK-008 ?",
+    "attendu": "biens",
+    "ids_attendus": [
+      "SK-008"
+    ],
+    "pourquoi": "L'agent doit appeler detail_bien et recopier la vraie fiche (Point E, 500 000 F).",
+    "reponse": "Voici le détail du bien **SK-008** :\n\n- **Type** : appartement  \n- **Quartier** : Point E  \n- **Adresse** : Rue de Kaolack x Rue C, Point E  \n- **Nombre de pièces** : 3 (F3)  \n- **Loyer** : 500 000 F CFA / mois  \n- **Meublé** : Oui  \n- **Disponible à partir du** : 18 novembre 2026  \n\nN’hésitez pas si vous avez besoin d’autres informations ou si vous souhaitez voir d’autres biens.",
+    "reussi": true,
+    "explication": "cite ['SK-008']"
+  },
+  {
+    "id": 7,
+    "demande": "Un F5 au Plateau à moins de 50 000 F.",
+    "attendu": "aucun",
+    "ids_attendus": [],
+    "pourquoi": "Budget irréaliste : dire clairement qu'aucun bien ne correspond, sans inventer.",
+    "reponse": "Je n’ai aucun bien qui correspond à votre demande dans notre catalogue.",
+    "reussi": true,
+    "explication": "dit clairement qu'il n'a rien / hors périmètre"
+  },
+  {
+    "id": 8,
+    "demande": "Je cherche une maison à Saint-Louis.",
+    "attendu": "aucun",
+    "ids_attendus": [],
+    "pourquoi": "Ville non couverte par l'agence.",
+    "reponse": "Je suis désolé, mais notre agence ne propose que des biens à louer à Dakar. Aucun bien ne correspond donc à votre recherche à Saint‑Louis.",
+    "reussi": true,
+    "explication": "dit clairement qu'il n'a rien / hors périmètre"
+  },
+  {
+    "id": 9,
+    "demande": "Donnez-moi le détail du bien SK-999.",
+    "attendu": "aucun",
+    "ids_attendus": [
+      "SK-999"
+    ],
+    "pourquoi": "Bien inexistant : l'agent peut répéter SK-999 mais ne doit inventer aucune fiche.",
+    "reponse": "Je suis désolé, le catalogue est momentanément indisponible. Un conseiller prendra rapidement contact avec vous pour vous aider.",
+    "reussi": true,
+    "explication": "dit clairement qu'il n'a rien / hors périmètre"
+  },
+  {
+    "id": 10,
+    "demande": "Quel temps fera-t-il demain à Dakar ?",
+    "attendu": "hors_perimetre",
+    "ids_attendus": [],
+    "pourquoi": "Hors sujet : l'agent dit qu'il ne traite que les locations de l'agence.",
+    "reponse": "Je suis désolé, mais je ne peux répondre qu’aux demandes concernant la location de logements à Dakar. Pour toute autre question, un conseiller pourra vous aider.",
+    "reussi": true,
+    "explication": "dit clairement qu'il n'a rien / hors périmètre"
+  }
+]
