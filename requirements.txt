@@ -2,7 +2,7 @@
 langgraph
 langchain-groq
 langchain-mcp-adapters
-mcp
+mcp<2
 python-dotenv
 google-api-python-client
 google-auth-oauthlib
