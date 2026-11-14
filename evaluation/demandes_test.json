@@ -1,0 +1,12 @@
+[
+  {"id": 1, "demande": "Je cherche un F3 à Mermoz à moins de 400 000 F par mois.", "attendu": "biens", "ids_attendus": ["SK-001"], "pourquoi": "SK-002 est aussi un F3 à Mermoz mais coûte 450 000 F : il ne doit PAS être cité."},
+  {"id": 2, "demande": "Bonjour, avez-vous un studio à Ngor ?", "attendu": "biens", "ids_attendus": ["SK-012"], "pourquoi": "Un seul studio à Ngor."},
+  {"id": 3, "demande": "Un appartement de 2 pièces à Ouakam, budget 250 000 F maximum.", "attendu": "biens", "ids_attendus": ["SK-014"], "pourquoi": "SK-015 est à Ouakam mais a 3 pièces."},
+  {"id": 4, "demande": "Je veux une villa aux Almadies.", "attendu": "biens", "ids_attendus": ["SK-010"], "pourquoi": "SK-011 est aux Almadies mais c'est un appartement."},
+  {"id": 5, "demande": "Quels biens sont disponibles aux Parcelles Assainies ?", "attendu": "biens", "ids_attendus": ["SK-025", "SK-027"], "pourquoi": "SK-026 est déjà loué : il ne doit PAS être cité."},
+  {"id": 6, "demande": "Pouvez-vous me donner le détail du bien SK-008 ?", "attendu": "biens", "ids_attendus": ["SK-008"], "pourquoi": "L'agent doit appeler detail_bien et recopier la vraie fiche (Point E, 500 000 F)."},
+  {"id": 7, "demande": "Un F5 au Plateau à moins de 50 000 F.", "attendu": "aucun", "ids_attendus": [], "pourquoi": "Budget irréaliste : dire clairement qu'aucun bien ne correspond, sans inventer."},
+  {"id": 8, "demande": "Je cherche une maison à Saint-Louis.", "attendu": "aucun", "ids_attendus": [], "pourquoi": "Ville non couverte par l'agence."},
+  {"id": 9, "demande": "Donnez-moi le détail du bien SK-999.", "attendu": "aucun", "ids_attendus": ["SK-999"], "pourquoi": "Bien inexistant : l'agent peut répéter SK-999 mais ne doit inventer aucune fiche."},
+  {"id": 10, "demande": "Quel temps fera-t-il demain à Dakar ?", "attendu": "hors_perimetre", "ids_attendus": [], "pourquoi": "Hors sujet : l'agent dit qu'il ne traite que les locations de l'agence."}
+]
