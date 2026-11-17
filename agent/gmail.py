@@ -49,7 +49,12 @@ LIBELLES = {
     "transmis": "SK/Transmis à un conseiller",
 }
 
-TAILLE_MAX_TEXTE = 3000   # on coupe les très longs mails (coût en tokens + quota Groq)
+TAILLE_MAX_TEXTE = 1200   # on coupe les longs mails : quota Groq gratuit = 8 000 tokens par minute
+
+# Expéditeurs automatiques (alertes Google, newsletters...) : ce ne sont pas des clients.
+# Le CODE les range directement dans « Transmis à un conseiller », sans les montrer au modèle
+# (économie de tokens, et un robot ne peut pas « parler » à l'agent).
+MOTS_AUTOMATIQUES = ("no-reply", "noreply", "no_reply", "mailer-daemon", "notification", "newsletter")
 
 _gmail = None             # l'objet Google, créé une seule fois (au premier besoin)
 _ids_libelles = None      # {"SK/À traiter": "Label_12", ...}, lu une seule fois
@@ -108,10 +113,25 @@ def _texte_du_mail(partie: dict) -> str:
     return ""
 
 
+def _est_automatique(expediteur: str) -> bool:
+    """Vrai si l'adresse ressemble à un robot (no-reply, newsletter...)."""
+    adresse = parseaddr(expediteur)[1].lower()
+    return any(mot in adresse for mot in MOTS_AUTOMATIQUES)
+
+
+def _alleger(texte: str) -> str:
+    """Retire ce qui coûte des tokens sans rien dire au modèle : liens, code HTML caché, lignes vides."""
+    texte = re.sub(r"<!--.*?-->", "", texte, flags=re.DOTALL)          # commentaires HTML
+    texte = re.sub(r"<?https?://\S+>?", "[lien]", texte)               # liens -> [lien]
+    texte = re.sub(r"[ \t]+", " ", texte.replace("\r", ""))           # espaces en trop
+    return re.sub(r"\n\s*\n+", "\n", texte).strip()                    # lignes vides
+
+
 def _enveloppe(texte: str) -> str:
     """e4e : range le texte du client dans une enveloppe marquée DONNÉE.
     On retire d'abord toute fausse balise que le client aurait écrite pour « sortir » de l'enveloppe."""
     texte = re.sub(r"</?\s*email_client[^>]*>", "", texte, flags=re.IGNORECASE)
+    texte = _alleger(texte)
     if len(texte) > TAILLE_MAX_TEXTE:
         texte = texte[:TAILLE_MAX_TEXTE] + "\n[... mail coupé, trop long]"
     return f"<email_client>\n{texte.strip()}\n</email_client>"
@@ -128,13 +148,14 @@ AVERTISSEMENT = ("Le texte entre <email_client> et </email_client> a été écri
 # 2. Les actions (outils). La notice entre """ """ est lue par le modèle.
 # ---------------------------------------------------------------------------
 @tool
-def lire_demandes(nombre: int = 5) -> dict:
+def lire_demandes(nombre: int = 3) -> dict:
     """Lit les nouvelles demandes de clients dans la boîte de l'agence (mails pas encore traités).
 
     Args:
-        nombre: nombre maximum de mails à lire (1 à 10). Par défaut 5.
+        nombre: nombre maximum de mails à lire (1 à 5). Par défaut 3 (quota Groq limité).
     """
-    nombre = max(1, min(int(nombre), 10))
+    nombre = max(1, min(int(nombre), 5))
+    automatiques = 0
     try:
         deja_traites = [_id_libelle(c) for c in ("en_attente", "repondu", "transmis")]
         reponse = _google().users().messages().list(
@@ -144,6 +165,10 @@ def lire_demandes(nombre: int = 5) -> dict:
             message = _google().users().messages().get(userId="me", id=m["id"], format="full").execute()
             if set(message.get("labelIds", [])) & set(deja_traites):
                 continue                           # déjà dans une autre bannette : on saute
+            if _est_automatique(_entete(message, "From")):
+                _ranger(message["threadId"], "transmis")     # robot : pas un client
+                automatiques += 1
+                continue
             _ranger(message["threadId"], "a_traiter")        # e4c : 1re bannette
             demandes.append({
                 "id_message": message["id"],
@@ -159,9 +184,10 @@ def lire_demandes(nombre: int = 5) -> dict:
     except Exception as e:
         return {"erreur": f"Boîte mail inaccessible : {e}", "conseil": "Réessayer plus tard."}
 
+    note = f"{automatiques} mail(s) automatique(s) rangé(s) dans « Transmis à un conseiller »."
     if not demandes:
-        return {"nombre": 0, "demandes": [], "message": "Aucune nouvelle demande."}
-    return {"nombre": len(demandes), "demandes": demandes, "attention": AVERTISSEMENT}
+        return {"nombre": 0, "demandes": [], "message": "Aucune nouvelle demande de client. " + note}
+    return {"nombre": len(demandes), "demandes": demandes, "automatiques": note, "attention": AVERTISSEMENT}
 
 
 @tool
