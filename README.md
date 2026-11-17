@@ -67,7 +67,7 @@ L'agent ne touche jamais directement aux données : il passe par le serveur MCP 
 
 | Brique | Notre choix | Pourquoi |
 |---|---|---|
-| Modèle | Groq, palier gratuit (`<modèle À CONFIRMER>`) | L'énoncé impose un usage gratuit ; appel d'outils natif ; déjà utilisé dans notre projet RAG |
+| Modèle | Groq, palier gratuit (`openai/gpt-oss-120b`) | L'énoncé impose un usage gratuit ; appel d'outils natif ; déjà utilisé dans notre projet RAG |
 | Framework d'agent | LangGraph | Open source ; pause pour la validation humaine (`interrupt`) et sauvegarde de l'état (checkpoints) intégrées |
 | Catalogue | SQLite + serveur MCP (FastMCP) | Imposé par l'énoncé |
 | Agenda et messagerie | API Google Calendar et Gmail, compte de test | Imposé par l'énoncé |
@@ -420,5 +420,31 @@ Si `git push` est refusé (« rejected »), faire `git pull` puis `git push`. Si
 ---
 
 ## 10. Résultats de l'évaluation
+
+### Résultats intermédiaires
+
+| Exercice | Test | Résultat | Détail |
+|---|---|---|---|
+| 1 | 10 demandes sur le catalogue (outils dans l'agent) | **10/10** | `evaluation/resultats_ex1.json` |
+| 2 | Inspecteur MCP, en local (STDIO) puis en HTTP | **OK** : 2 outils, 1 ressource, erreurs claires | `docs/tests_serveur_mcp.md` |
+| 2 | Les mêmes 10 demandes, via le serveur MCP | **10/10** | `evaluation/resultats_ex2.json` |
+| 3 | Règles des visites, sans Google | **OK** : 3 créneaux libres trouvés, dimanche et 17h30 refusés | `python agent/regles_agenda.py` |
+
+### Journal des ajustements
+
+Ce que nous avons rencontré, compris et corrigé au fil des exercices :
+
+| Exercice | Problème rencontré | Cause | Correction |
+|---|---|---|---|
+| 1 | Erreur `401 Invalid API Key` au premier lancement | 3 caractères (« git ») collés par erreur à la fin de la clé dans `.env` (59 caractères au lieu de 56) | Clé recopiée ; vérification de sa longueur sans l'afficher |
+| 1 | « F5 à 50 000 F » : l'agent relançait la recherche 10 fois en montant le budget | Le prompt ne limitait pas les recherches de repli | Prompt corrigé : une seule recherche de repli, puis « aucun bien » |
+| 1 | « Saint-Louis » : l'agent demandait un quartier | Le prompt ne disait pas que l'agence ne couvre que Dakar | Prompt corrigé : « l'agence ne loue qu'à Dakar » |
+| 1 | Erreur 429 de Groq pendant les tests | Quota gratuit (environ 8 000 tokens par minute) dépassé à cause des relances | Pauses entre les demandes dans le script de test |
+| 2 | `FastMCP` introuvable | `mcp` version 2 a renommé FastMCP | Version épinglée : `mcp<2` |
+| 2 | L'inspecteur MCP ne démarrait pas (Node 20), puis npm cassé après l'installation de Node 26 par-dessus | Version de Node trop ancienne, puis mélange de deux versions de npm | Désinstallation, suppression de `C:\Program Files\nodejs`, installation propre de Node 22 ; client MCP Python de secours écrit entre-temps |
+| 2 | 10/10, mais la demande « SK-999 » répondait « catalogue momentanément indisponible » | Le prompt confondait « bien introuvable » et « panne » | Prompt corrigé. Leçon : **un score ne suffit pas, il faut lire les réponses** (les traces l'ont montré) |
+| 3 | `Activate.ps1` refusé sur la machine de la classe | Exécution de scripts bloquée par Windows | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` (seulement la fenêtre ouverte) |
+| 3 | Google refuse de lister les agendas (erreur 403) | Droit volontairement limité à `calendar.app.created` | Identifiants enregistrés à la création dans `agent/agendas.json` |
+| 3 | `ZoneInfo("Africa/Dakar")` plante sous Windows | Windows n'a pas la base des fuseaux horaires | Paquet `tzdata` ajouté à `requirements.txt` |
 
 `<À COMPLÉTER à l'exercice 6>` : tableau avant / après correction (taux de réussite, appels d'outils, tokens, temps par email) et analyse des trois échecs.
