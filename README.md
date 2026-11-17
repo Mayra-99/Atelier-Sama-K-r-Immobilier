@@ -139,7 +139,16 @@ copy .env.example .env
 
 ### Accès Google
 
-`<À COMPLÉTER à l'exercice 3>` : création du projet Google Cloud, activation des API Calendar et Gmail, écran de consentement OAuth, téléchargement de `credentials.json` (à placer à la racine ; il est ignoré par Git).
+Une seule fois pour l'équipe, **avec le compte Google de test** (jamais un compte personnel), sur https://console.cloud.google.com :
+
+1. Créer un projet (`sama-ker-atelier`) et le sélectionner.
+2. **API et services → Bibliothèque** : activer **Google Calendar API** (et **Gmail API** à l'exercice 4).
+3. **Google Auth Platform** (écran de consentement OAuth) : nom `Agent Sama Kër`, audience **Externe**, e-mails = compte de test.
+4. **Audience → Utilisateurs tests** : ajouter l'adresse du compte de test (sinon Google refuse la connexion).
+5. **Clients → Créer un client** de type **Application de bureau**, puis **Télécharger le JSON**, le renommer `credentials.json` et le placer à la racine du dépôt.
+6. `python agent/google_auth.py` : le navigateur s'ouvre, choisir le compte de test, « Continuer » (application non validée : normal pour un projet d'école), puis **Autoriser**. Le fichier `token.json` est créé.
+
+`credentials.json` et `token.json` sont des **secrets** : ils sont dans `.gitignore`, ne vont jamais sur GitHub et se partagent en message privé. Chaque membre lance `python agent/google_auth.py` une fois pour avoir son propre `token.json`.
 
 | Droit OAuth demandé | Pourquoi |
 |---|---|
@@ -166,6 +175,7 @@ python serveur_mcp/serveur.py http      # serveur MCP seul, en HTTP, pour l'insp
 # Pour tester
 python evaluation/passer_demandes.py    # rejouer les 10 demandes du catalogue (exercices 1 et 2)
 python agent/regles_agenda.py           # vérifier les règles des visites, sans Google (exercice 3)
+python agent/tester_agenda.py           # essayer les 4 actions sur l'agenda d'Awa, avec validation (exercice 3)
 npx -y @modelcontextprotocol/inspector .venv\Scripts\python.exe serveur_mcp\serveur.py   # inspecteur MCP (exercice 2)
 ```
 
@@ -284,6 +294,52 @@ Fonctions utilisées par les actions de l'agenda :
 
 Exemple : jeudi, Awa déjà prise de 16h30 à 17h15, demande « fin d'après-midi » (après 15h) → **15h00, 15h45, 17h15**.
 
+### Les 4 actions de l'agent
+
+`agent/agenda.py` donne à l'agent 4 outils (liste `OUTILS_AGENDA`, ajoutée aux outils MCP dans `agent/main.py`) :
+
+| Outil | Arguments | Ce qu'il fait | Validation ? |
+|---|---|---|---|
+| `lister_creneaux_libres` | `date_debut` (AAAA-MM-JJ), `date_fin`, `apres_heure` (HH:MM), `quartier` | lit l'agenda du conseiller du quartier et renvoie les 3 premiers créneaux réellement libres | non (lecture) |
+| `creer_visite` | `id_bien`, `debut` (AAAA-MM-JJTHH:MM), `client`, `conseiller` | crée la visite avec l'adresse exacte du bien (lue dans le catalogue) | **oui** |
+| `deplacer_visite` | `id_visite`, `conseiller`, `nouveau_debut` | déplace une visite vers un créneau libre | **oui** |
+| `annuler_visite` | `id_visite`, `conseiller` | annule une visite | **oui** |
+
+Chaque outil vérifie les règles (`verifier_creneau`) et renvoie une erreur claire au modèle au lieu de planter (créneau pris, bien inconnu, agenda inaccessible...).
+
+`agent/main.py` ajoute au prompt la **date du jour** (sinon le modèle ne sait pas quel jour tombe « jeudi prochain ») et les règles du rendez-vous : toujours appeler `lister_creneaux_libres`, ne jamais inventer de créneau, ne créer la visite qu'après le choix du client.
+
+### Validation humaine
+
+Avant chaque **création, déplacement ou annulation**, `demander_validation` arrête l'agent et affiche le résumé au conseiller :
+
+```
+VALIDATION DU CONSEILLER REQUISE
+CRÉER la visite de SK-001 pour Mme Diallo
+  Conseiller : Awa Diop
+  Quand : jeudi 19/11 à 15h45 (45 min)
+  Adresse : Rue MZ-12, Villa 45, Mermoz
+Valider ? (o/n) >
+```
+
+Seul `o` laisse passer ; toute autre réponse est un refus et rien n'est écrit dans l'agenda. Lire l'agenda ne demande pas de validation : c'est sans risque.
+
+### Aucun doublon
+
+Deux protections :
+1. Juste avant d'écrire, l'outil **revérifie** que le créneau est encore libre (il a pu être pris depuis la proposition).
+2. L'identifiant Google de la visite est **calculé** à partir du conseiller et de l'heure : deux demandes sur le même créneau donnent le même identifiant, et Google refuse la deuxième (erreur 409). Une visite annulée au même créneau est réactivée au lieu d'être recréée.
+
+### Résultat des tests (17 nov)
+
+| Test | Résultat |
+|---|---|
+| « jeudi prochain en fin d'après-midi », Mermoz | 15h00, 15h45, 17h15 (16h30 occupé, sauté) |
+| Même créneau demandé deux fois | 2e demande refusée : aucun doublon |
+| Visite validée | apparaît dans « Visites · Awa Diop » avec l'adresse « Rue MZ-12, Villa 45, Mermoz » |
+| Réponse « n » à la validation | aucune écriture : visite non créée, non déplacée ou maintenue |
+| Agent complet (`python agent/main.py`) | le modèle enchaîne `detail_bien`, `lister_creneaux_libres`, `creer_visite` (validation), puis `annuler_visite` sur demande |
+
 ## 7. Travail à faire, de A à Z
 
 Chaque exercice ajoute une brique et se termine par un **critère d'acceptation** que le jury vérifie. On coche une case dès que c'est fait (sur GitHub : bouton crayon pour modifier le README, ou dans VS Code en remplaçant `[ ]` par `[x]`).
@@ -329,9 +385,9 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 
 - [x] Configurer l'accès OAuth au compte de test, avec un seul droit (`agent/google_auth.py`)
 - [x] Créer un agenda par conseiller et quelques faux rendez-vous de test (`agent/creer_agendas.py` → `agent/agendas.json`)
-- [ ] Quatre actions : lister les créneaux libres, créer, déplacer, annuler une visite
+- [x] Quatre actions : lister les créneaux libres, créer, déplacer, annuler une visite (`agent/agenda.py`, branchées dans `agent/main.py`)
 - [x] Règles : visites de 45 min, lundi-samedi 9h-18h, fuseau Africa/Dakar, adresse du bien dans l'événement (`agent/regles_agenda.py`)
-- [ ] Validation humaine avant chaque création, déplacement ou annulation
+- [x] Validation humaine avant chaque création, déplacement ou annulation (`demander_validation` dans `agent/agenda.py`)
 - [x] Vérification : « jeudi prochain en fin d'après-midi » donne trois créneaux réellement libres (Serigne Fallou, `python agent/tester_agenda.py`)
 - [x] Vérification : deux demandes sur le même créneau ne font aucun doublon (Serigne Fallou, `python agent/tester_agenda.py`)
 
