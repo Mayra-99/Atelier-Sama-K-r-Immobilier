@@ -145,7 +145,7 @@ copy .env.example .env
 |---|---|
 | `<À COMPLÉTER>` | Lire les messages |
 | `<À COMPLÉTER>` | Créer des brouillons et envoyer |
-| `<À COMPLÉTER>` | Gérer les événements de l'agenda |
+| `https://www.googleapis.com/auth/calendar.app.created` | Créer nos propres agendas (un par conseiller) et gérer leurs événements, **sans voir** les autres agendas du compte |
 
 ---
 
@@ -241,6 +241,49 @@ client = MultiServerMCPClient({
 outils = await client.get_tools()   # -> rechercher_biens, detail_bien
 ```
 
+## Agenda des conseillers (exercice 3)
+
+### Les 3 agendas
+
+Le script `agent/creer_agendas.py` crée dans Google Agenda (compte de test) un agenda par conseiller :
+
+| Clé | Conseiller (fictif) | Quartiers suivis |
+|---|---|---|
+| `Awa` | Awa Diop | Mermoz, Sacré-Cœur, Point E, Fann Résidence, Plateau, Médina |
+| `Ibrahima` | Ibrahima Sow | Almadies, Ngor, Ouakam, Mamelles, Yoff, Ouest Foire |
+| `Khady` | Khady Ba | Liberté 6, Sicap Baobab, HLM, Grand Yoff, Parcelles Assainies |
+
+Il y place aussi **6 faux rendez-vous** la semaine suivante, dont trois **le jeudi en fin d'après-midi** (Awa 16h30, Ibrahima 17h15, Khady 15h45), pour que le test « jeudi prochain en fin d'après-midi » ait de vrais créneaux occupés à éviter.
+
+**Pourquoi un script et pas à la main ?** Notre seul droit OAuth (`calendar.app.created`) ne donne accès qu'aux agendas **créés par notre application** : un agenda créé à la main serait invisible pour l'agent. C'est le principe du moindre privilège.
+
+**Pourquoi le fichier `agent/agendas.json` ?** Avec ce droit limité, Google refuse de lister les agendas (erreur 403). Le script enregistre donc l'identifiant de chaque agenda au moment de sa création : `{"Awa": "...@group.calendar.google.com", ...}`. Ces identifiants ne sont pas secrets : le fichier est sur GitHub, et les actions de l'agenda le lisent.
+
+**Idempotent :** on peut relancer le script sans danger. Un agenda déjà créé est réutilisé, et chaque faux rendez-vous a un identifiant fixe (`skrdv0001`...) : Google refuse le doublon (erreur 409), que le script ignore.
+
+### Les règles de l'agence
+
+`agent/regles_agenda.py` regroupe toutes les règles en un seul endroit et ne parle pas à Google (on le teste sans compte : `python agent/regles_agenda.py`) :
+
+| Règle | Valeur |
+|---|---|
+| Durée d'une visite | 45 minutes |
+| Jours | lundi au samedi (pas de visite le dimanche) |
+| Horaires | 9h00 à 18h00 : la visite doit être finie à 18h, dernier début à 17h15 |
+| Créneaux proposés | toutes les 45 min : 9h00, 9h45, 10h30... |
+| Fuseau | Africa/Dakar (paquet `tzdata` sous Windows) |
+| Événement | titre « Visite SK-xxx · client », **adresse du bien dans le lieu**, description avec le bien, le loyer, le client et le conseiller |
+
+Fonctions utilisées par les actions de l'agenda :
+
+| Fonction | Rôle |
+|---|---|
+| `verifier_creneau(debut)` | `None` si le créneau est autorisé, sinon une phrase claire (ex. « L'agence ne fait pas de visite le dimanche. ») |
+| `creneaux_libres(du, au, occupations, apres=None, nombre=3)` | les premiers créneaux autorisés **et** libres, une fois retirées les plages déjà prises |
+| `construire_evenement(debut, bien, client, conseiller)` | l'événement Google prêt à créer, avec l'adresse du bien |
+
+Exemple : jeudi, Awa déjà prise de 16h30 à 17h15, demande « fin d'après-midi » (après 15h) → **15h00, 15h45, 17h15**.
+
 ## 7. Travail à faire, de A à Z
 
 Chaque exercice ajoute une brique et se termine par un **critère d'acceptation** que le jury vérifie. On coche une case dès que c'est fait (sur GitHub : bouton crayon pour modifier le README, ou dans VS Code en remplaçant `[ ]` par `[x]`).
@@ -284,9 +327,10 @@ Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 
 Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 
-- [ ] Configurer l'accès OAuth au compte de test ; créer un agenda par conseiller
+- [x] Configurer l'accès OAuth au compte de test, avec un seul droit (`agent/google_auth.py`)
+- [x] Créer un agenda par conseiller et quelques faux rendez-vous de test (`agent/creer_agendas.py` → `agent/agendas.json`)
 - [ ] Quatre actions : lister les créneaux libres, créer, déplacer, annuler une visite
-- [ ] Règles : visites de 45 min, lundi-samedi 9h-18h, fuseau Africa/Dakar, adresse du bien dans l'événement
+- [x] Règles : visites de 45 min, lundi-samedi 9h-18h, fuseau Africa/Dakar, adresse du bien dans l'événement (`agent/regles_agenda.py`)
 - [ ] Validation humaine avant chaque création, déplacement ou annulation
 
 **Critère :** à « jeudi prochain en fin d'après-midi », l'agent propose trois créneaux réellement libres ; deux demandes sur le même créneau ne font aucun doublon ; l'événement validé apparaît avec le bon conseiller et la bonne adresse.
