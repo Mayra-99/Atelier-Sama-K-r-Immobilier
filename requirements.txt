@@ -7,3 +7,4 @@ python-dotenv
 google-api-python-client
 google-auth-oauthlib
 tzdata
+langgraph-checkpoint-sqlite   # exercice 5 : mémoire des conversations sauvegardée dans SQLite
