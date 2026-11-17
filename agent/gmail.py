@@ -2,12 +2,19 @@
 gmail.py : les actions de l'agent sur la boîte Gmail de l'agence (exercice 4, tâches de may).
   e4a : 3 actions : lire les demandes non traitées, créer un brouillon dans le bon fil,
         envoyer un brouillon validé par un conseiller.
+  e4c : changer le libellé du fil à chaque étape.
 
 IMAGE SIMPLE : l'agent est la SECRÉTAIRE qui ouvre le courrier de l'agence.
 - Elle LIT les lettres (lire_demandes) : sans risque.
 - Elle prépare une réponse au crayon (creer_brouillon) : rien ne part.
 - Avant de POSTER la lettre (envoyer_brouillon), elle la montre au conseiller : sans « oui »,
   rien ne part.
+- Elle range chaque lettre dans la bonne bannette (les libellés) :
+    SK/À traiter -> SK/En attente de validation -> SK/Répondu
+                 -> SK/Transmis à un conseiller (réclamation, négociation, hors périmètre...)
+
+Les libellés sont créés par le script de Serigne Fallou (tâche e4b) ; ce fichier les cherche
+par leur NOM (dictionnaire LIBELLES ci-dessous, noms convenus en équipe).
 
 Brancher sur l'agent (main.py) :
     from gmail import OUTILS_GMAIL
@@ -23,9 +30,18 @@ from langchain_core.tools import tool
 
 from agenda import demander_validation   # la même validation « o/n » que pour l'agenda (Atou)
 
+# Les 4 bannettes (noms exacts dans Gmail, convenus avec Fallou pour la tâche e4b)
+LIBELLES = {
+    "a_traiter": "SK/À traiter",
+    "en_attente": "SK/En attente de validation",
+    "repondu": "SK/Répondu",
+    "transmis": "SK/Transmis à un conseiller",
+}
+
 TAILLE_MAX_TEXTE = 3000   # on coupe les très longs mails (coût en tokens + quota Groq)
 
 _gmail = None             # l'objet Google, créé une seule fois (au premier besoin)
+_ids_libelles = None      # {"SK/À traiter": "Label_12", ...}, lu une seule fois
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +54,28 @@ def _google():
         from google_auth import service_gmail
         _gmail = service_gmail()
     return _gmail
+
+
+def _id_libelle(cle: str) -> str:
+    """Donne l'identifiant Gmail d'une bannette à partir de sa clé (ex. "repondu")."""
+    global _ids_libelles
+    if _ids_libelles is None:
+        reponse = _google().users().labels().list(userId="me").execute()
+        _ids_libelles = {l["name"]: l["id"] for l in reponse.get("labels", [])}
+    nom = LIBELLES[cle]
+    if nom not in _ids_libelles:
+        raise LookupError(f"Libellé « {nom} » absent de Gmail : lancer d'abord le script "
+                          "de création des libellés (tâche e4b de Fallou).")
+    return _ids_libelles[nom]
+
+
+def _ranger(id_fil: str, vers: str) -> None:
+    """e4c : met le fil dans la bannette `vers` et le retire des 3 autres."""
+    a_retirer = [_id_libelle(c) for c in LIBELLES if c != vers]
+    _google().users().threads().modify(
+        userId="me", id=id_fil,
+        body={"addLabelIds": [_id_libelle(vers)], "removeLabelIds": a_retirer},
+    ).execute()
 
 
 def _entete(message: dict, nom: str) -> str:
@@ -64,19 +102,22 @@ def _texte_du_mail(partie: dict) -> str:
 # ---------------------------------------------------------------------------
 @tool
 def lire_demandes(nombre: int = 5) -> dict:
-    """Lit les nouvelles demandes de clients dans la boîte de l'agence (mails non lus).
+    """Lit les nouvelles demandes de clients dans la boîte de l'agence (mails pas encore traités).
 
     Args:
         nombre: nombre maximum de mails à lire (1 à 10). Par défaut 5.
     """
     nombre = max(1, min(int(nombre), 10))
     try:
-        # Pour l'instant « non traité » = non lu. À la tâche e4c, on utilisera les libellés.
+        deja_traites = [_id_libelle(c) for c in ("en_attente", "repondu", "transmis")]
         reponse = _google().users().messages().list(
-            userId="me", labelIds=["INBOX"], q="is:unread", maxResults=nombre).execute()
+            userId="me", labelIds=["INBOX"], maxResults=30).execute()
         demandes = []
         for m in reponse.get("messages", []):
             message = _google().users().messages().get(userId="me", id=m["id"], format="full").execute()
+            if set(message.get("labelIds", [])) & set(deja_traites):
+                continue                           # déjà dans une autre bannette : on saute
+            _ranger(message["threadId"], "a_traiter")        # e4c : 1re bannette
             demandes.append({
                 "id_message": message["id"],
                 "expediteur": _entete(message, "From"),
@@ -84,6 +125,10 @@ def lire_demandes(nombre: int = 5) -> dict:
                 "date": _entete(message, "Date"),
                 "texte": (_texte_du_mail(message["payload"]) or message.get("snippet", ""))[:TAILLE_MAX_TEXTE],
             })
+            if len(demandes) >= nombre:
+                break
+    except LookupError as e:
+        return {"erreur": str(e)}
     except Exception as e:
         return {"erreur": f"Boîte mail inaccessible : {e}", "conseil": "Réessayer plus tard."}
 
@@ -131,6 +176,9 @@ def creer_brouillon(id_message: str, texte: str) -> dict:
     try:
         brouillon = _google().users().drafts().create(
             userId="me", body={"message": {"raw": brut, "threadId": origine["threadId"]}}).execute()
+        _ranger(origine["threadId"], "en_attente")          # e4c : 2e bannette
+    except LookupError as e:
+        return {"erreur": str(e)}
     except Exception as e:
         return {"erreur": f"Brouillon non créé : {e}", "conseil": "Transmettre à un conseiller."}
     return {"statut": "brouillon créé", "id_brouillon": brouillon["id"], "destinataire": destinataire,
@@ -159,13 +207,36 @@ def envoyer_brouillon(id_brouillon: str) -> dict:
                                                "Le brouillon reste dans Gmail pour être corrigé."}
     try:
         _google().users().drafts().send(userId="me", body={"id": id_brouillon}).execute()
+        _ranger(message["threadId"], "repondu")             # e4c : 3e bannette
+    except LookupError as e:
+        return {"statut": "envoyé", "attention": str(e)}
     except Exception as e:
         return {"erreur": f"Envoi impossible : {e}", "conseil": "Le conseiller enverra le brouillon à la main."}
     return {"statut": "envoyé", "message": "Réponse envoyée au client."}
 
 
+@tool
+def transmettre_a_conseiller(id_message: str, raison: str) -> dict:
+    """Transmet un mail à un conseiller humain, sans répondre : réclamation, négociation de loyer,
+    litige ou demande hors périmètre.
+
+    Args:
+        id_message: l'id_message renvoyé par lire_demandes.
+        raison: en une phrase, pourquoi le mail est transmis.
+    """
+    try:
+        message = _google().users().messages().get(userId="me", id=id_message, format="minimal").execute()
+        _ranger(message["threadId"], "transmis")            # e4c : bannette « conseiller »
+    except LookupError as e:
+        return {"erreur": str(e)}
+    except Exception as e:
+        return {"erreur": f"Mail {id_message} introuvable : {e}"}
+    return {"statut": "transmis", "raison": raison,
+            "message": "Mail rangé dans « SK/Transmis à un conseiller ». Ne pas répondre au client."}
+
+
 # La liste à ajouter aux outils de l'agent (main.py)
-OUTILS_GMAIL = [lire_demandes, creer_brouillon, envoyer_brouillon]
+OUTILS_GMAIL = [lire_demandes, creer_brouillon, envoyer_brouillon, transmettre_a_conseiller]
 
 
 # Test sans le modèle : « python agent/gmail.py » lit les 3 premières demandes (rien n'est envoyé)
