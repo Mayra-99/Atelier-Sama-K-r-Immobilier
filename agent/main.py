@@ -1,6 +1,7 @@
 """
 main.py : l'agent de Sama Kër Immobilier.
 Exercice 1 : tâche de may (e1e). Exercice 2 : branchement au serveur MCP par Fallou (e2d).
+Exercice 3 : ajout des 4 actions de l'agenda Google par Atou (e3c, e3e).
 
 Ce fichier assemble les morceaux de l'équipe :
   - le MODÈLE        : Groq (gratuit), qui sait appeler des outils ;
@@ -9,6 +10,8 @@ Ce fichier assemble les morceaux de l'équipe :
                        (serveur_mcp/serveur.py). L'agent est un CLIENT MCP : il ne
                        connaît plus le code des outils, il les demande au guichet ;
   - la BOUCLE        : LangGraph fait tourner « réfléchir -> agir -> observer » ;
+  - l'AGENDA         : 4 actions Google Calendar d'Atou (agenda.py), avec validation
+                       du conseiller avant chaque écriture ;
   - les TRACES       : le cahier de bord d'Atou (traces.py) note chaque appel d'outil.
 
 Lancement, depuis la racine du dépôt (environnement virtuel activé) :
@@ -18,6 +21,7 @@ Taper « quitter » pour arrêter.
 """
 
 import asyncio
+from datetime import datetime
 import os
 import sys
 from pathlib import Path
@@ -31,6 +35,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient   # le « câble 
 
 from prompt_systeme import PROMPT_SYSTEME   # fichier de Fallou
 from traces import CahierDeBord               # fichier d'Atou
+from agenda import OUTILS_AGENDA               # exercice 3 : les 4 actions de l'agenda (Atou)
+from regles_agenda import FUSEAU, NOMS_JOURS   # exercice 3 : heure de Dakar (may)
 
 # ------------------------------------------------------------------ réglages
 
@@ -75,6 +81,26 @@ def charger_outils_mcp() -> list:
     return outils
 
 
+# ------------------------------------------------------------------ consignes de l'exercice 3
+
+def consignes_visites() -> str:
+    """Ajoute au prompt de Fallou la date du jour et la façon de prendre un rendez-vous.
+    Sans la date du jour, le modèle ne peut pas savoir quel jour tombe « jeudi prochain »."""
+    maintenant = datetime.now(FUSEAU)
+    return f"""
+
+PRISE DE RENDEZ-VOUS (exercice 3)
+- Aujourd'hui, nous sommes le {NOMS_JOURS[maintenant.weekday()]} {maintenant:%d/%m/%Y} (heure de Dakar).
+- Pour proposer une visite, tu appelles TOUJOURS lister_creneaux_libres, avec le quartier du bien.
+  Tu ne proposes que les créneaux renvoyés par l'outil, jamais un créneau inventé.
+  « fin d'après-midi » = à partir de 15:00 ; « matin » = 9:00-12:00.
+- Tu n'appelles creer_visite qu'APRÈS que le client a choisi un créneau, avec son nom.
+- creer_visite, deplacer_visite et annuler_visite demandent l'accord du conseiller :
+  si la réponse est « refusé », tu dis au client que sa demande sera confirmée par un conseiller.
+- Garde l'id_visite et le conseiller renvoyés par creer_visite : ils servent pour déplacer ou annuler.
+"""
+
+
 # ------------------------------------------------------------------ l'agent
 
 def construire_agent():
@@ -83,10 +109,11 @@ def construire_agent():
         raise SystemExit("Clé manquante : mettre GROQ_API_KEY dans le fichier .env (voir .env.example).")
     modele = ChatGroq(model=MODELE, temperature=0)   # température 0 : réponses plus stables
     outils = charger_outils_mcp()                    # exercice 2 : les outils viennent du serveur MCP
+    outils = outils + OUTILS_AGENDA                  # exercice 3 : + les 4 actions de l'agenda
     return create_react_agent(
         model=modele,
         tools=outils,
-        prompt=PROMPT_SYSTEME,
+        prompt=PROMPT_SYSTEME + consignes_visites(),
         checkpointer=InMemorySaver(),   # garde l'historique de la conversation en cours
     )
 
