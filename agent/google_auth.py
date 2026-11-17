@@ -1,22 +1,30 @@
 """
-google_auth.py : la « clé » qui ouvre Google Calendar pour l'agent (exercice 3, tâche d'Atou e3a).
+google_auth.py : la « clé » qui ouvre Google Calendar et Gmail pour l'agent.
+Exercice 3 : tâche d'Atou (e3a). Exercice 4 : ajout du droit Gmail par may (e4a).
 
 IMAGE SIMPLE : OAuth, c'est une clé de bureau donnée à la secrétaire (l'agent).
 - credentials.json = la carte d'identité de NOTRE application (téléchargée sur Google Cloud).
 - token.json       = la clé elle-même, remise par Google APRÈS que le compte de test a dit « j'autorise ».
 Les deux restent sur l'ordinateur : ils sont dans .gitignore, ils ne vont JAMAIS sur GitHub.
 
-MOINDRE PRIVILÈGE : on ne demande qu'UN droit, « calendar.app.created ».
-Il permet de créer nos propres agendas (un par conseiller) et de lire / créer / modifier /
-supprimer les événements DE CES AGENDAS-LÀ seulement. L'agent ne voit donc ni l'agenda
-personnel du compte, ni les mails, ni les fichiers Drive.
+MOINDRE PRIVILÈGE : on ne demande que DEUX droits.
+- « calendar.app.created » (exercice 3) : créer nos propres agendas (un par conseiller) et
+  gérer les événements DE CES AGENDAS-LÀ seulement (pas l'agenda personnel du compte).
+- « gmail.modify » (exercice 4) : lire les mails, poser des libellés, créer des brouillons
+  et les envoyer. Il ne permet PAS de supprimer définitivement un mail.
+  Pourquoi pas « gmail.readonly » + « gmail.compose » ? readonly ne permet pas de changer
+  les libellés (tâche e4c), donc il faudrait quand même modify : un seul droit suffit.
+L'agent ne voit jamais les fichiers Drive ni les contacts.
 
-Utilisation dans le reste du code (actions de l'agenda, script de may) :
-    from google_auth import service_calendar
-    calendar = service_calendar()
+Utilisation dans le reste du code :
+    from google_auth import service_calendar, service_gmail
+    calendar = service_calendar()     # agenda.py, creer_agendas.py
+    gmail = service_gmail()           # gmail.py (exercice 4)
 
 Premier lancement, depuis la racine du dépôt (venv activé) :
     python agent/google_auth.py
+APRÈS L'AJOUT DU DROIT GMAIL : supprimer token.json, puis relancer cette commande une fois
+(l'ancienne clé ne contient que le droit Calendar ; Google refuserait les appels Gmail).
 Le navigateur s'ouvre : se connecter avec le compte Google DE TEST, puis « Autoriser ».
 """
 
@@ -37,10 +45,11 @@ load_dotenv(RACINE / ".env")
 CHEMIN_CREDENTIALS = RACINE / os.getenv("GOOGLE_CREDENTIALS", "credentials.json")
 CHEMIN_TOKEN = RACINE / os.getenv("GOOGLE_TOKEN", "token.json")
 
-# Le SEUL droit demandé (voir l'explication en haut du fichier).
-# Exercice 4 (Gmail) : on ajoutera ici les droits Gmail, puis on supprimera token.json
-# pour redemander l'autorisation une fois.
-DROITS = ["https://www.googleapis.com/auth/calendar.app.created"]
+# Les SEULS droits demandés (voir l'explication en haut du fichier).
+DROITS = [
+    "https://www.googleapis.com/auth/calendar.app.created",   # exercice 3 : nos agendas seulement
+    "https://www.googleapis.com/auth/gmail.modify",           # exercice 4 : lire, libellés, brouillons, envoi
+]
 
 
 def obtenir_identifiants() -> Credentials:
@@ -78,11 +87,16 @@ def service_calendar():
     return build("calendar", "v3", credentials=obtenir_identifiants())
 
 
+def service_gmail():
+    """Renvoie l'objet qui parle à l'API Gmail, prêt à l'emploi (exercice 4)."""
+    return build("gmail", "v1", credentials=obtenir_identifiants())
+
+
 # Test : « python agent/google_auth.py » vérifie que la clé marche.
 if __name__ == "__main__":
     calendar = service_calendar()
     print(f"Clé OK : {CHEMIN_TOKEN.name} créé (il reste sur ce PC, jamais sur GitHub).")
-    print(f"Droit accordé : {DROITS[0]}")
+    print(f"Droits accordés : {', '.join(DROITS)}")
     try:
         # Avec ce droit, on ne voit QUE les agendas créés par notre application
         # (au début : aucun, c'est normal ; may créera ceux des 3 conseillers).
@@ -91,3 +105,10 @@ if __name__ == "__main__":
     except HttpError as erreur:
         # Si Google refuse cette lecture, la clé marche quand même : c'est le moindre privilège.
         print(f"Lecture de la liste refusée par Google (droits limités, normal) : {erreur.status_code}")
+
+    # Exercice 4 : on vérifie aussi Gmail (adresse du compte connecté)
+    try:
+        profil = service_gmail().users().getProfile(userId="me").execute()
+        print(f"Gmail OK : boîte {profil['emailAddress']} ({profil.get('messagesTotal', '?')} messages)")
+    except HttpError as erreur:
+        print(f"Gmail refusé ({erreur.status_code}) : supprimer token.json, activer Gmail API, relancer.")
