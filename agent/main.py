@@ -33,6 +33,7 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
+from groq import RateLimitError                # erreur 429 : quota gratuit Groq dépassé
 from langgraph.prebuilt import create_react_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient   # le « câble » vers le serveur MCP
 
@@ -111,7 +112,8 @@ def construire_agent():
     """Crée l'agent : modèle + outils + prompt système + mémoire de conversation."""
     if not os.getenv("GROQ_API_KEY"):
         raise SystemExit("Clé manquante : mettre GROQ_API_KEY dans le fichier .env (voir .env.example).")
-    modele = ChatGroq(model=MODELE, temperature=0)   # température 0 : réponses plus stables
+    # température 0 : réponses plus stables ; max_retries : en cas de 429, on réessaie (après une pause)
+    modele = ChatGroq(model=MODELE, temperature=0, max_retries=5)
     outils = charger_outils_mcp()                    # exercice 2 : les outils viennent du serveur MCP
     outils = outils + OUTILS_AGENDA                  # exercice 3 : + les 4 actions de l'agenda
     outils = outils + OUTILS_GMAIL                   # exercice 4 : + les actions Gmail
@@ -138,6 +140,11 @@ def repondre(agent, question: str, cahier: CahierDeBord, id_conversation: str = 
             agent.ainvoke({"messages": [("user", question)]}, config)
         )
         reponse = resultat["messages"][-1].content
+    except RateLimitError:
+        # quota gratuit Groq (8 000 tokens par minute) dépassé malgré les essais : on ne plante pas
+        reponse = ("Le service est très sollicité (quota gratuit dépassé). "
+                   "Attendez une minute puis renvoyez votre demande.")
+        cahier._noter({"type": "arret", "raison": "erreur 429 Groq (quota de tokens par minute)"})
     except GraphRecursionError:
         # garde-fou : l'agent a tourné trop longtemps, on s'arrête proprement
         reponse = ("Je n'arrive pas à traiter votre demande pour le moment. "
