@@ -1,0 +1,3 @@
+{"type": "demande", "texte": "visite pour le dimanche", "heure": "2026-11-17T10:27:20"}
+{"type": "tokens_modele", "usage": {"completion_tokens": 137, "prompt_tokens": 2006, "total_tokens": 2143, "completion_time": 0.286443378, "completion_tokens_details": {"reasoning_tokens": 81}, "prompt_time": 0.113407536, "prompt_tokens_details": null, "queue_time": 0.640638627, "total_time": 0.399850914}, "heure": "2026-11-17T10:27:22"}
+{"type": "reponse", "texte": "Je suis désolé, mais les visites de nos biens sont possibles uniquement du lundi au samedi, de 9 h à 18 h. Souhaitez‑vous choisir un autre jour de la semaine pour votre visite ?", "heure": "2026-11-17T10:27:22"}
