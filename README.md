@@ -26,7 +26,7 @@ Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il 
 | Membre | Compte GitHub |
 |---|---|
 | Maimouna Diallo | `Mayra-99` |
-| Serigne Fallou Mbaye | `<À COMPLÉTER>` |
+| Serigne Fallou Mbaye | `galassmyname` |
 | Atou Diagne | `Atou-D10` |
 
 Nous réalisons **tous les exercices ensemble**, pour que chacun comprenne l'ensemble du pipeline.
@@ -67,7 +67,7 @@ L'agent ne touche jamais directement aux données : il passe par le serveur MCP 
 
 | Brique | Notre choix | Pourquoi |
 |---|---|---|
-| Modèle | Groq, palier gratuit (`<modèle À CONFIRMER>`) | L'énoncé impose un usage gratuit ; appel d'outils natif ; déjà utilisé dans notre projet RAG |
+| Modèle | Groq, palier gratuit (`openai/gpt-oss-120b`) | L'énoncé impose un usage gratuit ; appel d'outils natif ; déjà utilisé dans notre projet RAG |
 | Framework d'agent | LangGraph | Open source ; pause pour la validation humaine (`interrupt`) et sauvegarde de l'état (checkpoints) intégrées |
 | Catalogue | SQLite + serveur MCP (FastMCP) | Imposé par l'énoncé |
 | Agenda et messagerie | API Google Calendar et Gmail, compte de test | Imposé par l'énoncé |
@@ -124,8 +124,13 @@ python -m venv .venv
 #    Si PowerShell refuse à cause des « scripts », taper une fois :
 #    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #    puis relancer l'activation. C'est bon quand (.venv) apparaît.
+#    Sur une machine de la classe (sans droits) : autoriser seulement cette fenêtre,
+#    à retaper à chaque nouvelle fenêtre :
+#    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+#    Dernier recours : passer par cmd, puis .venv\Scripts\activate.bat
 
 # 3. Installer les bibliothèques
+#    (dont tzdata : sans lui, le fuseau Africa/Dakar ne marche pas sous Windows)
 pip install -r requirements.txt
 
 # 4. Créer sa configuration, puis l'ouvrir dans VS Code et coller la clé Groq
@@ -140,20 +145,31 @@ copy .env.example .env
 |---|---|
 | `<À COMPLÉTER>` | Lire les messages |
 | `<À COMPLÉTER>` | Créer des brouillons et envoyer |
-| `<À COMPLÉTER>` | Gérer les événements de l'agenda |
+| `https://www.googleapis.com/auth/calendar.app.created` | Créer nos propres agendas (un par conseiller) et gérer leurs événements, **sans voir** les autres agendas du compte |
 
 ---
 
 ## 6. Lancement
 
-`<À COMPLÉTER au fil des exercices>`
+Depuis la racine du dépôt, environnement virtuel activé :
 
 ```
-python serveur_mcp/creer_catalogue.py   # créer la base du catalogue (exercice 1)
-python serveur_mcp/serveur.py           # lancer le serveur MCP (exercice 2)
-python agent/main.py                    # lancer l'agent (exercices 1 à 5)
-python evaluation/evaluer.py            # rejouer les tests, tableau de résultats (exercice 6)
+# Une seule fois
+python serveur_mcp/creer_catalogue.py   # créer la base du catalogue : 30 biens (exercice 1)
+python agent/google_auth.py             # autoriser l'accès Google avec le compte de TEST (exercice 3)
+python agent/creer_agendas.py           # créer les 3 agendas des conseillers + faux rendez-vous (exercice 3)
+
+# Pour travailler
+python agent/main.py                    # discuter avec l'agent ; il lance lui-même le serveur MCP (exercices 1 à 5)
+python serveur_mcp/serveur.py http      # serveur MCP seul, en HTTP, pour l'inspecteur ou une autre équipe (exercice 2)
+
+# Pour tester
+python evaluation/passer_demandes.py    # rejouer les 10 demandes du catalogue (exercices 1 et 2)
+python agent/regles_agenda.py           # vérifier les règles des visites, sans Google (exercice 3)
+npx -y @modelcontextprotocol/inspector .venv\Scripts\python.exe serveur_mcp\serveur.py   # inspecteur MCP (exercice 2)
 ```
+
+`<À COMPLÉTER>` : évaluation complète (exercice 6).
 
 ---
 ## Serveur MCP du catalogue
@@ -225,16 +241,59 @@ client = MultiServerMCPClient({
 outils = await client.get_tools()   # -> rechercher_biens, detail_bien
 ```
 
+## Agenda des conseillers (exercice 3)
+
+### Les 3 agendas
+
+Le script `agent/creer_agendas.py` crée dans Google Agenda (compte de test) un agenda par conseiller :
+
+| Clé | Conseiller (fictif) | Quartiers suivis |
+|---|---|---|
+| `Awa` | Awa Diop | Mermoz, Sacré-Cœur, Point E, Fann Résidence, Plateau, Médina |
+| `Ibrahima` | Ibrahima Sow | Almadies, Ngor, Ouakam, Mamelles, Yoff, Ouest Foire |
+| `Khady` | Khady Ba | Liberté 6, Sicap Baobab, HLM, Grand Yoff, Parcelles Assainies |
+
+Il y place aussi **6 faux rendez-vous** la semaine suivante, dont trois **le jeudi en fin d'après-midi** (Awa 16h30, Ibrahima 17h15, Khady 15h45), pour que le test « jeudi prochain en fin d'après-midi » ait de vrais créneaux occupés à éviter.
+
+**Pourquoi un script et pas à la main ?** Notre seul droit OAuth (`calendar.app.created`) ne donne accès qu'aux agendas **créés par notre application** : un agenda créé à la main serait invisible pour l'agent. C'est le principe du moindre privilège.
+
+**Pourquoi le fichier `agent/agendas.json` ?** Avec ce droit limité, Google refuse de lister les agendas (erreur 403). Le script enregistre donc l'identifiant de chaque agenda au moment de sa création : `{"Awa": "...@group.calendar.google.com", ...}`. Ces identifiants ne sont pas secrets : le fichier est sur GitHub, et les actions de l'agenda le lisent.
+
+**Idempotent :** on peut relancer le script sans danger. Un agenda déjà créé est réutilisé, et chaque faux rendez-vous a un identifiant fixe (`skrdv0001`...) : Google refuse le doublon (erreur 409), que le script ignore.
+
+### Les règles de l'agence
+
+`agent/regles_agenda.py` regroupe toutes les règles en un seul endroit et ne parle pas à Google (on le teste sans compte : `python agent/regles_agenda.py`) :
+
+| Règle | Valeur |
+|---|---|
+| Durée d'une visite | 45 minutes |
+| Jours | lundi au samedi (pas de visite le dimanche) |
+| Horaires | 9h00 à 18h00 : la visite doit être finie à 18h, dernier début à 17h15 |
+| Créneaux proposés | toutes les 45 min : 9h00, 9h45, 10h30... |
+| Fuseau | Africa/Dakar (paquet `tzdata` sous Windows) |
+| Événement | titre « Visite SK-xxx · client », **adresse du bien dans le lieu**, description avec le bien, le loyer, le client et le conseiller |
+
+Fonctions utilisées par les actions de l'agenda :
+
+| Fonction | Rôle |
+|---|---|
+| `verifier_creneau(debut)` | `None` si le créneau est autorisé, sinon une phrase claire (ex. « L'agence ne fait pas de visite le dimanche. ») |
+| `creneaux_libres(du, au, occupations, apres=None, nombre=3)` | les premiers créneaux autorisés **et** libres, une fois retirées les plages déjà prises |
+| `construire_evenement(debut, bien, client, conseiller)` | l'événement Google prêt à créer, avec l'adresse du bien |
+
+Exemple : jeudi, Awa déjà prise de 16h30 à 17h15, demande « fin d'après-midi » (après 15h) → **15h00, 15h45, 17h15**.
+
 ## 7. Travail à faire, de A à Z
 
 Chaque exercice ajoute une brique et se termine par un **critère d'acceptation** que le jury vérifie. On coche une case dès que c'est fait (sur GitHub : bouton crayon pour modifier le README, ou dans VS Code en remplaçant `[ ]` par `[x]`).
 
 ### Étape 0 · Préparer le terrain · 13 nov
 
-- [ ] Créer le compte Google de test de l'équipe
-- [ ] Créer le compte Groq et la clé API gratuite
-- [ ] Créer le dépôt GitHub, y envoyer ce squelette, inviter les deux autres
-- [ ] Chacun : cloner le dépôt et installer l'environnement (section 5)
+- [x] Créer le compte Google de test de l'équipe
+- [x] Créer le compte Groq et la clé API gratuite
+- [x] Créer le dépôt GitHub, y envoyer ce squelette, inviter les deux autres
+- [x] Chacun : cloner le dépôt et installer l'environnement (section 5)
 
 ### Exercice 1 · Un modèle qui interroge le catalogue · 14 nov · 10 pts
 
@@ -268,10 +327,13 @@ Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 
 Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 
-- [ ] Configurer l'accès OAuth au compte de test ; créer un agenda par conseiller
+- [x] Configurer l'accès OAuth au compte de test, avec un seul droit (`agent/google_auth.py`)
+- [x] Créer un agenda par conseiller et quelques faux rendez-vous de test (`agent/creer_agendas.py` → `agent/agendas.json`)
 - [ ] Quatre actions : lister les créneaux libres, créer, déplacer, annuler une visite
-- [ ] Règles : visites de 45 min, lundi-samedi 9h-18h, fuseau Africa/Dakar, adresse du bien dans l'événement
+- [x] Règles : visites de 45 min, lundi-samedi 9h-18h, fuseau Africa/Dakar, adresse du bien dans l'événement (`agent/regles_agenda.py`)
 - [ ] Validation humaine avant chaque création, déplacement ou annulation
+- [x] Vérification : « jeudi prochain en fin d'après-midi » donne trois créneaux réellement libres (Serigne Fallou, `python agent/tester_agenda.py`)
+- [x] Vérification : deux demandes sur le même créneau ne font aucun doublon (Serigne Fallou, `python agent/tester_agenda.py`)
 
 **Critère :** à « jeudi prochain en fin d'après-midi », l'agent propose trois créneaux réellement libres ; deux demandes sur le même créneau ne font aucun doublon ; l'événement validé apparaît avec le bon conseiller et la bonne adresse.
 
@@ -360,5 +422,34 @@ Si `git push` est refusé (« rejected »), faire `git pull` puis `git push`. Si
 ---
 
 ## 10. Résultats de l'évaluation
+
+### Résultats intermédiaires
+
+| Exercice | Test | Résultat | Détail |
+|---|---|---|---|
+| 1 | 10 demandes sur le catalogue (outils dans l'agent) | **10/10** | `evaluation/resultats_ex1.json` |
+| 2 | Inspecteur MCP, en local (STDIO) puis en HTTP | **OK** : 2 outils, 1 ressource, erreurs claires | `docs/tests_serveur_mcp.md` |
+| 2 | Les mêmes 10 demandes, via le serveur MCP | **10/10** | `evaluation/resultats_ex2.json` |
+| 3 | Règles des visites, sans Google | **OK** : 3 créneaux libres trouvés, dimanche et 17h30 refusés | `python agent/regles_agenda.py` |
+| 3 | « Jeudi prochain en fin d'après-midi », vrai agenda Google (Mermoz → Awa) | **OK** : 15h00, 15h45, 17h15 ; le faux rendez-vous de 16h30 est sauté | `python agent/tester_agenda.py` (vérifié par Serigne Fallou, 17 nov) |
+| 3 | Même créneau réservé deux fois | **OK** : 2e demande refusée (« n'est plus libre chez Awa Diop »), aucun doublon | idem |
+| 3 | Validation humaine | **OK** : rien n'est créé, déplacé ou annulé sans `o` du conseiller (un essai interrompu par Ctrl+C n'a rien créé) ; agenda remis propre après le test | idem |
+
+### Journal des ajustements
+
+Ce que nous avons rencontré, compris et corrigé au fil des exercices :
+
+| Exercice | Problème rencontré | Cause | Correction |
+|---|---|---|---|
+| 1 | Erreur `401 Invalid API Key` au premier lancement | 3 caractères (« git ») collés par erreur à la fin de la clé dans `.env` (59 caractères au lieu de 56) | Clé recopiée ; vérification de sa longueur sans l'afficher |
+| 1 | « F5 à 50 000 F » : l'agent relançait la recherche 10 fois en montant le budget | Le prompt ne limitait pas les recherches de repli | Prompt corrigé : une seule recherche de repli, puis « aucun bien » |
+| 1 | « Saint-Louis » : l'agent demandait un quartier | Le prompt ne disait pas que l'agence ne couvre que Dakar | Prompt corrigé : « l'agence ne loue qu'à Dakar » |
+| 1 | Erreur 429 de Groq pendant les tests | Quota gratuit (environ 8 000 tokens par minute) dépassé à cause des relances | Pauses entre les demandes dans le script de test |
+| 2 | `FastMCP` introuvable | `mcp` version 2 a renommé FastMCP | Version épinglée : `mcp<2` |
+| 2 | L'inspecteur MCP ne démarrait pas (Node 20), puis npm cassé après l'installation de Node 26 par-dessus | Version de Node trop ancienne, puis mélange de deux versions de npm | Désinstallation, suppression de `C:\Program Files\nodejs`, installation propre de Node 22 ; client MCP Python de secours écrit entre-temps |
+| 2 | 10/10, mais la demande « SK-999 » répondait « catalogue momentanément indisponible » | Le prompt confondait « bien introuvable » et « panne » | Prompt corrigé. Leçon : **un score ne suffit pas, il faut lire les réponses** (les traces l'ont montré) |
+| 3 | `Activate.ps1` refusé sur la machine de la classe | Exécution de scripts bloquée par Windows | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` (seulement la fenêtre ouverte) |
+| 3 | Google refuse de lister les agendas (erreur 403) | Droit volontairement limité à `calendar.app.created` | Identifiants enregistrés à la création dans `agent/agendas.json` |
+| 3 | `ZoneInfo("Africa/Dakar")` plante sous Windows | Windows n'a pas la base des fuseaux horaires | Paquet `tzdata` ajouté à `requirements.txt` |
 
 `<À COMPLÉTER à l'exercice 6>` : tableau avant / après correction (taux de réussite, appels d'outils, tokens, temps par email) et analyse des trois échecs.
