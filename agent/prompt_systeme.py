@@ -59,6 +59,12 @@ STYLE
 """
 
 
+# Exercice 4 (e4d) : on ajoute le modèle de réponse aux consignes.
+# main.py continue d'importer PROMPT_SYSTEME sans rien changer.
+from modele_reponse import CONSIGNES_REPONSE
+PROMPT_SYSTEME = PROMPT_SYSTEME + CONSIGNES_REPONSE
+
+
 # Petit contrôle : « python agent/prompt_systeme.py » affiche le prompt.
 if __name__ == "__main__":
     print(PROMPT_SYSTEME)
