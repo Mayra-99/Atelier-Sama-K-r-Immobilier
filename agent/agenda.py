@@ -1,11 +1,11 @@
 """
-agenda.py : les 4 actions de l'agent sur Google Calendar (exercice 3, tâche d'Atou e3c).
+agenda.py : les 4 actions de l'agent sur Google Calendar (exercice 3, tâches d'Atou e3c + e3e).
 
 IMAGE SIMPLE : l'agent est la SECRÉTAIRE de l'agence, avec le cahier de rendez-vous
 des 3 conseillers.
 - Elle peut LIRE le cahier quand elle veut (lister les créneaux libres) : sans risque.
-- Elle peut ÉCRIRE, DÉPLACER ou RAYER un rendez-vous, en respectant le règlement.
-  (Étape suivante, e3e : demander l'accord du conseiller avant chaque écriture.)
+- Avant d'ÉCRIRE, de DÉPLACER ou de RAYER un rendez-vous, elle demande l'accord du
+  conseiller (validation humaine). Sans « oui », rien n'est écrit.
 
 Ce fichier s'appuie sur le travail de l'équipe :
 - google_auth.py     (Atou) : la clé OAuth, droit minimal calendar.app.created ;
@@ -124,7 +124,25 @@ def _creneau_pris(id_agenda: str, debut: datetime, sauf: Optional[str] = None) -
 
 
 # ---------------------------------------------------------------------------
-# 2. Les 4 actions (outils). La notice entre """ """ est lue par le modèle.
+# 2. La validation humaine (e3e)
+# ---------------------------------------------------------------------------
+def demander_validation(resume: str) -> bool:
+    """
+    L'agent S'ARRÊTE et montre au conseiller ce qu'il va faire. Seul « o » (oui) laisse passer.
+    Toute autre réponse (n, vide, faute de frappe) = refus : en cas de doute, on n'écrit pas.
+    À l'exercice 5, cette fonction pourra être remplacée (ex. bouton, ou interruption LangGraph)
+    sans toucher aux 4 actions.
+    """
+    print("\n" + "=" * 60)
+    print("VALIDATION DU CONSEILLER REQUISE")
+    print(resume)
+    reponse = input("Valider ? (o/n) > ").strip().lower()
+    print("=" * 60)
+    return reponse in ("o", "oui", "y", "yes")
+
+
+# ---------------------------------------------------------------------------
+# 3. Les 4 actions (outils). La notice entre """ """ est lue par le modèle.
 # ---------------------------------------------------------------------------
 @tool
 def lister_creneaux_libres(date_debut: str, date_fin: Optional[str] = None,
@@ -175,7 +193,7 @@ def lister_creneaux_libres(date_debut: str, date_fin: Optional[str] = None,
 
 @tool
 def creer_visite(id_bien: str, debut: str, client: str, conseiller: Optional[str] = None) -> dict:
-    """Réserve une visite dans l'agenda du conseiller.
+    """Réserve une visite dans l'agenda du conseiller, APRÈS accord du conseiller (validation humaine).
 
     Args:
         id_bien: identifiant du bien à visiter, ex. "SK-001" (renvoyé par rechercher_biens).
@@ -210,6 +228,13 @@ def creer_visite(id_bien: str, debut: str, client: str, conseiller: Optional[str
         evenement = construire_evenement(moment, bien, client, nom)    # règles de may
         evenement["id"] = _id_visite(cle, moment)
 
+        # VALIDATION HUMAINE : rien n'est écrit sans « oui »
+        if not demander_validation(
+            f"CRÉER la visite de {bien['id']} pour {client}\n"
+            f"  Conseiller : {nom}\n  Quand : {en_texte(moment)} (45 min)\n  Adresse : {bien['adresse']}"
+        ):
+            return {"statut": "refusé", "message": "Le conseiller n'a pas validé : aucune visite créée."}
+
         try:
             _google().events().insert(calendarId=id_agenda, body=evenement).execute()
         except HttpError as e:
@@ -232,7 +257,7 @@ def creer_visite(id_bien: str, debut: str, client: str, conseiller: Optional[str
 
 @tool
 def deplacer_visite(id_visite: str, conseiller: str, nouveau_debut: str) -> dict:
-    """Déplace une visite existante vers un autre créneau.
+    """Déplace une visite existante vers un autre créneau, APRÈS accord du conseiller.
 
     Args:
         id_visite: identifiant renvoyé par creer_visite (commence par "visite").
@@ -262,6 +287,11 @@ def deplacer_visite(id_visite: str, conseiller: str, nouveau_debut: str) -> dict
             return {"erreur": f"Le créneau {en_texte(moment)} n'est pas libre chez {nom}.",
                     "conseil": "Proposer un autre créneau avec lister_creneaux_libres."}
 
+        if not demander_validation(
+            f"DÉPLACER la visite « {ev.get('summary', id_visite)} »\n"
+            f"  Conseiller : {nom}\n  De : {en_texte(ancien)}\n  À  : {en_texte(moment)}"
+        ):
+            return {"statut": "refusé", "message": "Le conseiller n'a pas validé : la visite n'a pas bougé."}
 
         _google().events().patch(calendarId=id_agenda, eventId=id_visite, body={
             "start": {"dateTime": moment.isoformat(), "timeZone": "Africa/Dakar"},
@@ -274,7 +304,7 @@ def deplacer_visite(id_visite: str, conseiller: str, nouveau_debut: str) -> dict
 
 @tool
 def annuler_visite(id_visite: str, conseiller: str) -> dict:
-    """Annule une visite existante.
+    """Annule une visite existante, APRÈS accord du conseiller.
 
     Args:
         id_visite: identifiant renvoyé par creer_visite (commence par "visite").
@@ -292,6 +322,11 @@ def annuler_visite(id_visite: str, conseiller: str) -> dict:
         if ev.get("status") == "cancelled":
             return {"statut": "déjà annulée", "message": "Cette visite était déjà annulée."}
 
+        if not demander_validation(
+            f"ANNULER la visite « {ev.get('summary', id_visite)} »\n"
+            f"  Conseiller : {nom}\n  Prévue : {en_texte(lire_date_google(ev['start']['dateTime']))}"
+        ):
+            return {"statut": "refusé", "message": "Le conseiller n'a pas validé : la visite est maintenue."}
 
         _google().events().delete(calendarId=id_agenda, eventId=id_visite).execute()
     except Exception as e:
