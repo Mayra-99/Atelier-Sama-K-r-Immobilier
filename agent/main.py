@@ -2,6 +2,7 @@
 main.py : l'agent de Sama Kër Immobilier.
 Exercice 1 : tâche de may (e1e). Exercice 2 : branchement au serveur MCP par Fallou (e2d).
 Exercice 3 : ajout des 4 actions de l'agenda Google par Atou (e3c, e3e).
+Exercice 4 : ajout des actions Gmail par may (e4a, e4c, e4e).
 
 Ce fichier assemble les morceaux de l'équipe :
   - le MODÈLE        : Groq (gratuit), qui sait appeler des outils ;
@@ -12,6 +13,8 @@ Ce fichier assemble les morceaux de l'équipe :
   - la BOUCLE        : LangGraph fait tourner « réfléchir -> agir -> observer » ;
   - l'AGENDA         : 4 actions Google Calendar d'Atou (agenda.py), avec validation
                        du conseiller avant chaque écriture ;
+  - la BOÎTE MAIL    : actions Gmail de may (gmail.py) : lire, brouillon, envoi validé,
+                       libellés, et contenu des mails traité comme une DONNÉE ;
   - les TRACES       : le cahier de bord d'Atou (traces.py) note chaque appel d'outil.
 
 Lancement, depuis la racine du dépôt (environnement virtuel activé) :
@@ -37,6 +40,7 @@ from prompt_systeme import PROMPT_SYSTEME   # fichier de Fallou
 from traces import CahierDeBord               # fichier d'Atou
 from agenda import OUTILS_AGENDA               # exercice 3 : les 4 actions de l'agenda (Atou)
 from regles_agenda import FUSEAU, NOMS_JOURS   # exercice 3 : heure de Dakar (may)
+from gmail import OUTILS_GMAIL, consignes_emails   # exercice 4 : la boîte de l'agence (may)
 
 # ------------------------------------------------------------------ réglages
 
@@ -110,10 +114,11 @@ def construire_agent():
     modele = ChatGroq(model=MODELE, temperature=0)   # température 0 : réponses plus stables
     outils = charger_outils_mcp()                    # exercice 2 : les outils viennent du serveur MCP
     outils = outils + OUTILS_AGENDA                  # exercice 3 : + les 4 actions de l'agenda
+    outils = outils + OUTILS_GMAIL                   # exercice 4 : + les actions Gmail
     return create_react_agent(
         model=modele,
         tools=outils,
-        prompt=PROMPT_SYSTEME + consignes_visites(),
+        prompt=PROMPT_SYSTEME + consignes_visites() + consignes_emails(),
         checkpointer=InMemorySaver(),   # garde l'historique de la conversation en cours
     )
 
