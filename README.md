@@ -124,8 +124,13 @@ python -m venv .venv
 #    Si PowerShell refuse à cause des « scripts », taper une fois :
 #    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 #    puis relancer l'activation. C'est bon quand (.venv) apparaît.
+#    Sur une machine de la classe (sans droits) : autoriser seulement cette fenêtre,
+#    à retaper à chaque nouvelle fenêtre :
+#    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+#    Dernier recours : passer par cmd, puis .venv\Scripts\activate.bat
 
 # 3. Installer les bibliothèques
+#    (dont tzdata : sans lui, le fuseau Africa/Dakar ne marche pas sous Windows)
 pip install -r requirements.txt
 
 # 4. Créer sa configuration, puis l'ouvrir dans VS Code et coller la clé Groq
@@ -146,14 +151,25 @@ copy .env.example .env
 
 ## 6. Lancement
 
-`<À COMPLÉTER au fil des exercices>`
+Depuis la racine du dépôt, environnement virtuel activé :
 
 ```
-python serveur_mcp/creer_catalogue.py   # créer la base du catalogue (exercice 1)
-python serveur_mcp/serveur.py           # lancer le serveur MCP (exercice 2)
-python agent/main.py                    # lancer l'agent (exercices 1 à 5)
-python evaluation/evaluer.py            # rejouer les tests, tableau de résultats (exercice 6)
+# Une seule fois
+python serveur_mcp/creer_catalogue.py   # créer la base du catalogue : 30 biens (exercice 1)
+python agent/google_auth.py             # autoriser l'accès Google avec le compte de TEST (exercice 3)
+python agent/creer_agendas.py           # créer les 3 agendas des conseillers + faux rendez-vous (exercice 3)
+
+# Pour travailler
+python agent/main.py                    # discuter avec l'agent ; il lance lui-même le serveur MCP (exercices 1 à 5)
+python serveur_mcp/serveur.py http      # serveur MCP seul, en HTTP, pour l'inspecteur ou une autre équipe (exercice 2)
+
+# Pour tester
+python evaluation/passer_demandes.py    # rejouer les 10 demandes du catalogue (exercices 1 et 2)
+python agent/regles_agenda.py           # vérifier les règles des visites, sans Google (exercice 3)
+npx -y @modelcontextprotocol/inspector .venv\Scripts\python.exe serveur_mcp\serveur.py   # inspecteur MCP (exercice 2)
 ```
+
+`<À COMPLÉTER>` : évaluation complète (exercice 6).
 
 ---
 ## Serveur MCP du catalogue
