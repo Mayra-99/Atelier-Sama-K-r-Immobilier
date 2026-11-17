@@ -26,7 +26,7 @@ Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il 
 | Membre | Compte GitHub |
 |---|---|
 | Maimouna Diallo | `Mayra-99` |
-| Serigne Fallou Mbaye | `<À COMPLÉTER>` |
+| Serigne Fallou Mbaye | `galassmyname` |
 | Atou Diagne | `Atou-D10` |
 
 Nous réalisons **tous les exercices ensemble**, pour que chacun comprenne l'ensemble du pipeline.
@@ -71,7 +71,7 @@ L'agent ne touche jamais directement aux données : il passe par le serveur MCP 
 | Framework d'agent | LangGraph | Open source ; pause pour la validation humaine (`interrupt`) et sauvegarde de l'état (checkpoints) intégrées |
 | Catalogue | SQLite + serveur MCP (FastMCP) | Imposé par l'énoncé |
 | Agenda et messagerie | API Google Calendar et Gmail, compte de test | Imposé par l'énoncé |
-| Validation humaine | `<Gradio ou ligne de commande, À CHOISIR>` | |
+| Validation humaine | Ligne de commande : le conseiller tape `o` ou `n` (`demander_validation` dans `agent/agenda.py`) | Simple et sûr : seul `o` laisse passer ; remplaçable plus tard sans toucher aux outils |
 
 ---
 
@@ -79,15 +79,32 @@ L'agent ne touche jamais directement aux données : il passe par le serveur MCP 
 
 ```
 Atelier-Sama-K-r-Immobilier/
-├── agent/              code de l'agent : boucle, outils Google, validation humaine
-├── serveur_mcp/        serveur MCP du catalogue + script de création de la base
-├── evaluation/         15 emails de test, résultats attendus, script d'évaluation
-├── traces/             traces de 3 traitements complets, dont un échec analysé
-├── docs/               schémas et captures pour la présentation
-├── .env.example        modèle de configuration, sans aucun identifiant réel
-├── .gitignore          liste des fichiers que Git ne doit jamais envoyer
-├── requirements.txt    liste des bibliothèques Python à installer
-└── README.md           ce document
+├── agent/
+│   ├── main.py              l'agent : modèle Groq + outils (MCP + agenda) + prompt + mémoire ; c'est lui qu'on lance
+│   ├── prompt_systeme.py    les consignes données au modèle (catalogue seulement, rien d'inventé)
+│   ├── traces.py            cahier de bord : chaque appel d'outil est noté dans traces/*.jsonl
+│   ├── google_auth.py       connexion OAuth au compte Google de TEST (crée token.json)
+│   ├── regles_agenda.py     règles des visites (45 min, lun-sam 9h-18h, Africa/Dakar), sans Google
+│   ├── creer_agendas.py     crée une fois les 3 agendas des conseillers + 6 faux rendez-vous
+│   ├── agendas.json         identifiants des 3 agendas (pas secrets), lus par agenda.py
+│   ├── agenda.py            les 4 actions de l'agenda + validation humaine
+│   └── tester_agenda.py     test des 4 actions sur le vrai agenda d'Awa
+├── serveur_mcp/
+│   ├── biens.py             les 30 biens fictifs
+│   ├── creer_catalogue.py   crée la base SQLite catalogue.db (non envoyée sur GitHub)
+│   ├── serveur.py           serveur MCP : outils rechercher_biens, detail_bien (stdio ou http)
+│   ├── ressource_agence.py  ressource agence://infos (horaires, quartiers, conditions)
+│   └── verifier_ressource.py  petit client de test du serveur
+├── evaluation/
+│   ├── demandes_test.json   les 10 demandes de test et les biens attendus
+│   ├── passer_demandes.py   rejoue les 10 demandes et calcule le score
+│   └── resultats_ex1.json, resultats_ex2.json   scores obtenus (10/10)
+├── docs/                tests_serveur_mcp.md + captures/ de l'inspecteur MCP
+├── traces/              traces des traitements (les traces de nos essais restent en local)
+├── .env.example         modèle de configuration, sans aucun identifiant réel
+├── .gitignore           liste des fichiers que Git ne doit jamais envoyer
+├── requirements.txt     liste des bibliothèques Python à installer
+└── README.md            ce document
 ```
 
 Les trois petits fichiers de la racine :
@@ -96,7 +113,9 @@ Les trois petits fichiers de la racine :
 - **`.env.example`** : le modèle du fichier de configuration. Chacun le copie en `.env` et y met les vraies clés, qui restent sur son ordinateur.
 - **`requirements.txt`** : la liste des bibliothèques ; `pip install -r requirements.txt` les installe toutes d'un coup.
 
-Les dossiers contiennent pour l'instant un fichier vide `.gitkeep` : Git n'enregistre pas les dossiers vides, ce fichier sert juste à les garder.
+Les fichiers vides `.gitkeep` servent seulement à garder des dossiers encore vides (Git n'enregistre pas les dossiers vides).
+
+**Fichiers qui ne sont PAS sur GitHub et qu'il faut avoir en local :** `.env` (copié depuis `.env.example`, avec la clé Groq), `credentials.json` (reçu en message privé), `token.json` (créé par `python agent/google_auth.py`), `serveur_mcp/catalogue.db` (créé par `python serveur_mcp/creer_catalogue.py`).
 
 ---
 
@@ -139,7 +158,16 @@ copy .env.example .env
 
 ### Accès Google
 
-`<À COMPLÉTER à l'exercice 3>` : création du projet Google Cloud, activation des API Calendar et Gmail, écran de consentement OAuth, téléchargement de `credentials.json` (à placer à la racine ; il est ignoré par Git).
+Une seule fois pour l'équipe, **avec le compte Google de test** (jamais un compte personnel), sur https://console.cloud.google.com :
+
+1. Créer un projet (`sama-ker-atelier`) et le sélectionner.
+2. **API et services → Bibliothèque** : activer **Google Calendar API** (et **Gmail API** à l'exercice 4).
+3. **Google Auth Platform** (écran de consentement OAuth) : nom `Agent Sama Kër`, audience **Externe**, e-mails = compte de test.
+4. **Audience → Utilisateurs tests** : ajouter l'adresse du compte de test (sinon Google refuse la connexion).
+5. **Clients → Créer un client** de type **Application de bureau**, puis **Télécharger le JSON**, le renommer `credentials.json` et le placer à la racine du dépôt.
+6. `python agent/google_auth.py` : le navigateur s'ouvre, choisir le compte de test, « Continuer » (application non validée : normal pour un projet d'école), puis **Autoriser**. Le fichier `token.json` est créé.
+
+`credentials.json` et `token.json` sont des **secrets** : ils sont dans `.gitignore`, ne vont jamais sur GitHub et se partagent en message privé. Chaque membre lance `python agent/google_auth.py` une fois pour avoir son propre `token.json`.
 
 | Droit OAuth demandé | Pourquoi |
 |---|---|
@@ -157,15 +185,18 @@ Depuis la racine du dépôt, environnement virtuel activé :
 # Une seule fois
 python serveur_mcp/creer_catalogue.py   # créer la base du catalogue : 30 biens (exercice 1)
 python agent/google_auth.py             # autoriser l'accès Google avec le compte de TEST (exercice 3)
-python agent/creer_agendas.py           # créer les 3 agendas des conseillers + faux rendez-vous (exercice 3)
+python agent/creer_agendas.py           # 3 agendas + faux rendez-vous (exercice 3) : DÉJÀ FAIT pour l'équipe,
+                                        #   agendas.json est sur GitHub ; sans danger si on le relance (idempotent)
 
 # Pour travailler
 python agent/main.py                    # discuter avec l'agent ; il lance lui-même le serveur MCP (exercices 1 à 5)
+                                        #   variante HTTP : lancer d'abord le serveur en http, puis dans .env : MCP_TRANSPORT=http
 python serveur_mcp/serveur.py http      # serveur MCP seul, en HTTP, pour l'inspecteur ou une autre équipe (exercice 2)
 
 # Pour tester
 python evaluation/passer_demandes.py    # rejouer les 10 demandes du catalogue (exercices 1 et 2)
 python agent/regles_agenda.py           # vérifier les règles des visites, sans Google (exercice 3)
+python agent/tester_agenda.py           # essayer les 4 actions sur l'agenda d'Awa, avec validation (exercice 3)
 npx -y @modelcontextprotocol/inspector .venv\Scripts\python.exe serveur_mcp\serveur.py   # inspecteur MCP (exercice 2)
 ```
 
@@ -284,16 +315,62 @@ Fonctions utilisées par les actions de l'agenda :
 
 Exemple : jeudi, Awa déjà prise de 16h30 à 17h15, demande « fin d'après-midi » (après 15h) → **15h00, 15h45, 17h15**.
 
+### Les 4 actions de l'agent
+
+`agent/agenda.py` donne à l'agent 4 outils (liste `OUTILS_AGENDA`, ajoutée aux outils MCP dans `agent/main.py`) :
+
+| Outil | Arguments | Ce qu'il fait | Validation ? |
+|---|---|---|---|
+| `lister_creneaux_libres` | `date_debut` (AAAA-MM-JJ), `date_fin`, `apres_heure` (HH:MM), `quartier` | lit l'agenda du conseiller du quartier et renvoie les 3 premiers créneaux réellement libres | non (lecture) |
+| `creer_visite` | `id_bien`, `debut` (AAAA-MM-JJTHH:MM), `client`, `conseiller` | crée la visite avec l'adresse exacte du bien (lue dans le catalogue) | **oui** |
+| `deplacer_visite` | `id_visite`, `conseiller`, `nouveau_debut` | déplace une visite vers un créneau libre | **oui** |
+| `annuler_visite` | `id_visite`, `conseiller` | annule une visite | **oui** |
+
+Chaque outil vérifie les règles (`verifier_creneau`) et renvoie une erreur claire au modèle au lieu de planter (créneau pris, bien inconnu, agenda inaccessible...).
+
+`agent/main.py` ajoute au prompt la **date du jour** (sinon le modèle ne sait pas quel jour tombe « jeudi prochain ») et les règles du rendez-vous : toujours appeler `lister_creneaux_libres`, ne jamais inventer de créneau, ne créer la visite qu'après le choix du client.
+
+### Validation humaine
+
+Avant chaque **création, déplacement ou annulation**, `demander_validation` arrête l'agent et affiche le résumé au conseiller :
+
+```
+VALIDATION DU CONSEILLER REQUISE
+CRÉER la visite de SK-001 pour Mme Diallo
+  Conseiller : Awa Diop
+  Quand : jeudi 19/11 à 15h45 (45 min)
+  Adresse : Rue MZ-12, Villa 45, Mermoz
+Valider ? (o/n) >
+```
+
+Seul `o` laisse passer ; toute autre réponse est un refus et rien n'est écrit dans l'agenda. Lire l'agenda ne demande pas de validation : c'est sans risque.
+
+### Aucun doublon
+
+Deux protections :
+1. Juste avant d'écrire, l'outil **revérifie** que le créneau est encore libre (il a pu être pris depuis la proposition).
+2. L'identifiant Google de la visite est **calculé** à partir du conseiller et de l'heure : deux demandes sur le même créneau donnent le même identifiant, et Google refuse la deuxième (erreur 409). Une visite annulée au même créneau est réactivée au lieu d'être recréée.
+
+### Résultat des tests (17 nov)
+
+| Test | Résultat |
+|---|---|
+| « jeudi prochain en fin d'après-midi », Mermoz | 15h00, 15h45, 17h15 (16h30 occupé, sauté) |
+| Même créneau demandé deux fois | 2e demande refusée : aucun doublon |
+| Visite validée | apparaît dans « Visites · Awa Diop » avec l'adresse « Rue MZ-12, Villa 45, Mermoz » |
+| Réponse « n » à la validation | aucune écriture : visite non créée, non déplacée ou maintenue |
+| Agent complet (`python agent/main.py`) | le modèle enchaîne `detail_bien`, `lister_creneaux_libres`, `creer_visite` (validation), puis `annuler_visite` sur demande |
+
 ## 7. Travail à faire, de A à Z
 
 Chaque exercice ajoute une brique et se termine par un **critère d'acceptation** que le jury vérifie. On coche une case dès que c'est fait (sur GitHub : bouton crayon pour modifier le README, ou dans VS Code en remplaçant `[ ]` par `[x]`).
 
 ### Étape 0 · Préparer le terrain · 13 nov
 
-- [ ] Créer le compte Google de test de l'équipe
-- [ ] Créer le compte Groq et la clé API gratuite
-- [ ] Créer le dépôt GitHub, y envoyer ce squelette, inviter les deux autres
-- [ ] Chacun : cloner le dépôt et installer l'environnement (section 5)
+- [x] Créer le compte Google de test de l'équipe
+- [x] Créer le compte Groq et la clé API gratuite
+- [x] Créer le dépôt GitHub, y envoyer ce squelette, inviter les deux autres
+- [x] Chacun : cloner le dépôt et installer l'environnement (section 5)
 
 ### Exercice 1 · Un modèle qui interroge le catalogue · 14 nov · 10 pts
 
@@ -329,9 +406,11 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 
 - [x] Configurer l'accès OAuth au compte de test, avec un seul droit (`agent/google_auth.py`)
 - [x] Créer un agenda par conseiller et quelques faux rendez-vous de test (`agent/creer_agendas.py` → `agent/agendas.json`)
-- [ ] Quatre actions : lister les créneaux libres, créer, déplacer, annuler une visite
+- [x] Quatre actions : lister les créneaux libres, créer, déplacer, annuler une visite (`agent/agenda.py`, branchées dans `agent/main.py`)
 - [x] Règles : visites de 45 min, lundi-samedi 9h-18h, fuseau Africa/Dakar, adresse du bien dans l'événement (`agent/regles_agenda.py`)
-- [ ] Validation humaine avant chaque création, déplacement ou annulation
+- [x] Validation humaine avant chaque création, déplacement ou annulation (`demander_validation` dans `agent/agenda.py`)
+- [x] Vérification : « jeudi prochain en fin d'après-midi » donne trois créneaux réellement libres (Serigne Fallou, `python agent/tester_agenda.py`)
+- [x] Vérification : deux demandes sur le même créneau ne font aucun doublon (Serigne Fallou, `python agent/tester_agenda.py`)
 
 **Critère :** à « jeudi prochain en fin d'après-midi », l'agent propose trois créneaux réellement libres ; deux demandes sur le même créneau ne font aucun doublon ; l'événement validé apparaît avec le bon conseiller et la bonne adresse.
 
@@ -429,6 +508,9 @@ Si `git push` est refusé (« rejected »), faire `git pull` puis `git push`. Si
 | 2 | Inspecteur MCP, en local (STDIO) puis en HTTP | **OK** : 2 outils, 1 ressource, erreurs claires | `docs/tests_serveur_mcp.md` |
 | 2 | Les mêmes 10 demandes, via le serveur MCP | **10/10** | `evaluation/resultats_ex2.json` |
 | 3 | Règles des visites, sans Google | **OK** : 3 créneaux libres trouvés, dimanche et 17h30 refusés | `python agent/regles_agenda.py` |
+| 3 | « Jeudi prochain en fin d'après-midi », vrai agenda Google (Mermoz → Awa) | **OK** : 15h00, 15h45, 17h15 ; le faux rendez-vous de 16h30 est sauté | `python agent/tester_agenda.py` (vérifié par Serigne Fallou, 17 nov) |
+| 3 | Même créneau réservé deux fois | **OK** : 2e demande refusée (« n'est plus libre chez Awa Diop »), aucun doublon | idem |
+| 3 | Validation humaine | **OK** : rien n'est créé, déplacé ou annulé sans `o` du conseiller (un essai interrompu par Ctrl+C n'a rien créé) ; agenda remis propre après le test | idem |
 
 ### Journal des ajustements
 
