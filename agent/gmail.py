@@ -161,7 +161,11 @@ def lire_demandes(nombre: int = 3) -> dict:
         reponse = _google().users().messages().list(
             userId="me", labelIds=["INBOX"], maxResults=30).execute()
         demandes = []
+        fils_vus = set()   # e5e : un seul mail par fil (le plus récent, Gmail les donne du plus récent au plus ancien)
         for m in reponse.get("messages", []):
+            if m["threadId"] in fils_vus:
+                continue                           # e5e : ancien mail d'un fil déjà pris -> ne pas le retraiter
+            fils_vus.add(m["threadId"])
             message = _google().users().messages().get(userId="me", id=m["id"], format="full").execute()
             if set(message.get("labelIds", [])) & set(deja_traites):
                 continue                           # déjà dans une autre bannette : on saute
