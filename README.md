@@ -416,6 +416,32 @@ Mail « F3 à Mermoz, 400 000 F max » envoyé à la boîte de test, puis « tra
 
 `agent/pipeline.py` assemble toutes les briques pour traiter une demande **du mail du client jusqu'à la visite dans l'agenda**. Schéma détaillé (tournée et 4 branches) : [docs/schema_pipeline.md](docs/schema_pipeline.md).
 
+Les 4 branches que l'agent choisit pour chaque mail (A nouvelle demande, B confirmation, C hors périmètre, D panne) :
+
+```mermaid
+flowchart TD
+    M["Mail du client + historique du fil"] --> Q{"Quel cas ?"}
+
+    Q -->|"A. Nouvelle demande"| A1["Comprendre le besoin : quartier, type, pièces, budget, date"]
+    A1 --> A2["rechercher_biens (catalogue MCP, 2 recherches max)"]
+    A2 --> A3["lister_creneaux_libres (agenda)"]
+    A3 --> A4["creer_brouillon : SK/En attente de validation"]
+    A4 --> V1{"VALIDATION 1 du conseiller"}
+    V1 -->|"o"| A5["envoyer_brouillon : SK/Répondu"]
+    V1 -->|"n"| STOP["Arrêt, sans réessayer"]
+
+    Q -->|"B. Le client confirme un créneau"| B1["confirmer_visite"]
+    B1 --> B2{"Créneau encore libre ?"}
+    B2 -->|"oui"| V2{"VALIDATION 2 : visite + mail de confirmation"}
+    V2 -->|"o"| B3["Visite créée dans l'agenda + confirmation envoyée"]
+    V2 -->|"n"| STOP
+    B2 -->|"non, pris entre-temps"| A3
+
+    Q -->|"C. Hors périmètre : négociation, réclamation, litige, consignes cachées"| C1["transmettre_a_conseiller : SK/Transmis"]
+    Q -->|"D. Outil en panne"| C1
+    Q -->|"Information indispensable manquante"| I1["Brouillon avec UNE question"] --> V1
+```
+
 **Image simple :** la journée de travail de la secrétaire. Elle relève le courrier, ressort le dossier du client (rangé sous le numéro du fil Gmail), fait le travail avec les outils de l'équipe, demande l'accord du conseiller avant tout envoi, puis range le dossier.
 
 ### Ce que fait une tournée
@@ -527,9 +553,26 @@ Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 - [x] Garder l'état de chaque conversation d'un message à l'autre, à partir du fil Gmail (Serigne Fallou, `thread_id` du fil + sauvegarde SQLite)
 - [x] Mode « surveiller » : le pipeline reste allumé pendant la démo (Serigne Fallou)
 - [x] Schéma du graphe pour le README et la démo (Atou, [docs/schema_pipeline.md](docs/schema_pipeline.md))
-- [ ] Sorties de route : outil en erreur, créneau pris entre-temps, demande incomplète, hors périmètre transmis
+- [x] Sorties de route : outil en erreur, créneau pris entre-temps, demande incomplète, hors périmètre transmis (consignes : Serigne Fallou, `CONSIGNES_PIPELINE` ; tests : Atou, 18 nov)
 
 **Critère :** un email du jury aboutit à une réponse envoyée puis à une visite dans l'agenda, avec deux validations humaines et aucune autre intervention.
+
+#### Tests des sorties de route (Atou, 18 nov, `python agent/pipeline.py`, vrais mails)
+
+| # | Sortie de route | Mail envoyé | Ce que l'agent a fait | Résultat |
+|---|---|---|---|---|
+| 1 | Demande incomplète | « Je cherche un appartement. » | Pas de recherche, brouillon qui demande quartier, pièces, budget et date → validation 1 | ✅ |
+| 2 | Hors périmètre | Réclamation : fuite d'eau dans le SK-005 | `transmettre_a_conseiller` (réclamation), aucun brouillon, libellé « SK/Transmis » | ✅ |
+| 3 | Outil en panne | Studio à Mermoz, base `catalogue.db` cachée | `rechercher_biens` → « Catalogue inaccessible » → `transmettre_a_conseiller` avec la raison, aucun bien inventé | ✅ |
+| 4 | Créneau pris entre-temps | Le client choisit 9h00, mais un événement est ajouté à 9h00 dans l'agenda d'Awa avant sa réponse | `confirmer_visite` refuse (« n'est plus libre ») → `lister_creneaux_libres` → nouveau brouillon avec 9h45, 11h15, 12h00 → validation ; aucune visite créée à 9h00 | ✅ |
+
+**Bug trouvé pendant le test 4 et corrigé :** quand le client répond dans un fil déjà traité, `lire_demandes`
+rangeait tout le fil dans « À traiter ». Le libellé « Répondu » disparaissait aussi du mail d'origine, qui était
+relu comme une nouvelle demande : une 2e proposition en double a été préparée (refusée par le conseiller, rien
+n'est parti). Correction dans `agent/gmail.py` (Maimouna) : un seul mail par fil, le plus récent.
+
+**Remarques (pistes, pas des échecs) :** « Monsieur Moussa » (titre + prénom) ; le pipeline ne lit pas encore
+la ressource `agence://infos`.
 
 ### Exercice 6 · Mesurer et fiabiliser · 18 nov · 10 pts
 
