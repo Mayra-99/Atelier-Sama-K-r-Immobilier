@@ -1,0 +1,284 @@
+{
+  "etiquette": "apres",
+  "modele": "openai/gpt-oss-120b",
+  "date": "2026-11-18 22:09",
+  "resume": {
+    "reussis": 15,
+    "total": 15,
+    "taux": 100,
+    "appels_moyens": 2.9,
+    "tokens_moyens": 16326,
+    "secondes_moyennes": 24.3
+  },
+  "resultats": [
+    {
+      "id": 1,
+      "categorie": "simple",
+      "objet": "Recherche F3 Mermoz",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "rechercher_biens",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 21137,
+      "secondes": 76.1,
+      "brouillon": "Bonjour Madame Ndiaye,\n\nMerci pour votre demande.\n\n- SK-001 · appartement 3 pièces · Mermoz · 350 000 F CFA par mois · disponible le 20/11\n\nCréneaux de visite disponibles :\n- jeudi 19/11 à 09h45 avec Awa Diop\n- jeudi 19/11 à 11h15 avec Awa Diop\n- jeudi 19/11 à 12h00 avec Awa Diop\n\nVeuillez répondre en indiquant le bien choisi et le créneau qui vous convient.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 2,
+      "categorie": "simple",
+      "objet": "Studio à Ngor",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "rechercher_biens",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 21125,
+      "secondes": 32.5,
+      "brouillon": "Bonjour,\n\nMerci pour votre demande.\n\n- SK-012 · studio 1 pièce · Ngor · 200 000 F CFA par mois · disponible le 17/11\n\nCréneaux de visite disponibles :\n- jeudi 19/11 à 09h00 avec Ibrahima Sow\n- jeudi 19/11 à 09h45 avec Ibrahima Sow\n- jeudi 19/11 à 10h30 avec Ibrahima Sow\n\nVeuillez répondre en indiquant le bien choisi et le créneau qui vous convient.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 3,
+      "categorie": "simple",
+      "objet": "Parcelles Assainies",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "rechercher_biens",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 21660,
+      "secondes": 67.8,
+      "brouillon": "Bonjour Aïssatou,\n\nMerci pour votre demande concernant un logement aux Parcelles Assainies.\n\n- SK-027 · studio 1 pièce · Parcelles Assainies · 80 000 F CFA par mois · disponible le 16/11\n- SK-025 · appartement 3 pièces · Parcelles Assainies · 170 000 F CFA par mois · disponible le 20/11\n\nCréneaux de visite disponibles :\n- jeudi 19/11 à 09h00 avec Khady Ba\n- jeudi 19/11 à 09h45 avec Khady Ba\n- jeudi 19/11 à 10h30 avec Khady Ba\n\nMerci de bien vouloir répondre en indiquant le bien choisi (ex. SK-027) ainsi que le créneau qui vous convient.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 4,
+      "categorie": "bien inexistant",
+      "objet": "Bien SK-999",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 3,
+      "outils": [
+        "detail_bien",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 15834,
+      "secondes": 44.6,
+      "brouillon": "Bonjour,\n\nNous vous remercions pour votre demande. Le bien SK-999 n'existe pas dans notre catalogue.\n\nPourriez‑vous préciser le quartier, le nombre de pièces ou le budget souhaité afin que nous puissions vous proposer des logements disponibles ?\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 5,
+      "categorie": "bien inexistant",
+      "objet": "Villa à Saly",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 2,
+      "outils": [
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 12350,
+      "secondes": 21.9,
+      "brouillon": "Bonjour,\n\nNous vous remercions pour votre demande. L'agence Sama Kër Immobilier ne propose que des locations à Dakar. Nous n'avons donc aucun bien correspondant à votre recherche de villa avec piscine à Saly pour 200 000 F CFA.\n\nSi vous cherchez un logement à Dakar, n'hésitez pas à nous préciser le quartier, le type de bien, le nombre de pièces et votre budget, afin que nous puissions vous proposer des options adaptées.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 6,
+      "categorie": "bien inexistant",
+      "objet": "F5 au Plateau",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "rechercher_biens",
+        "rechercher_biens",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 20017,
+      "secondes": 53.3,
+      "brouillon": "Bonjour,\n\nNous vous remercions pour votre demande.\n\nJe n'ai aucun bien qui correspond à votre recherche d'un appartement 5 pièces au Plateau avec un loyer inférieur à 50 000 F CFA dans notre catalogue.\n\nSouhaitez-vous envisager un budget légèrement supérieur ou élargir votre recherche à un autre quartier de Dakar ? Merci de nous préciser vos critères afin que nous puissions vous proposer des solutions adaptées.\n\nCordialement,\nL'équipe Sama Kër Immobilier",
+      "raison_transmis": ""
+    },
+    {
+      "id": 7,
+      "categorie": "créneau pris",
+      "objet": "Visite SK-001 jeudi",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "detail_bien",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 21668,
+      "secondes": 13.5,
+      "brouillon": "Bonjour Ndeye,\n\nMerci pour votre demande de visite.\n\n- SK-001 · appartement 3 pièces · Mermoz · 350 000 F CFA par mois · disponible le 20/11\n\nCréneaux disponibles pour une visite le jeudi 19/11 :\n- jeudi 19/11 à 15h00 avec Awa Diop\n- jeudi 19/11 à 17h15 avec Awa Diop\n\nMerci de nous indiquer le créneau qui vous convient.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 8,
+      "categorie": "créneau pris",
+      "objet": "Visite dimanche soir",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "detail_bien",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 21593,
+      "secondes": 33.4,
+      "brouillon": "Bonjour,\n\nMerci pour votre demande de visite.\n\n- SK-005 · appartement 3 pièces · Sacré-Cœur · 300 000 F CFA par mois · disponible le 25/11\n\nCréneaux de visite disponibles :\n- jeudi 19/11 à 09h45 avec Awa Diop\n- jeudi 19/11 à 11h15 avec Awa Diop\n- jeudi 19/11 à 12h00 avec Awa Diop\n\nVeuillez répondre en indiquant le bien et le créneau que vous choisissez.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 9,
+      "categorie": "ambigu",
+      "objet": "Logement",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 2,
+      "outils": [
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 11910,
+      "secondes": 2.5,
+      "brouillon": "Bonjour,\n\nMerci pour votre demande. Afin de vous proposer des logements correspondant à vos attentes, pourriez‑vous préciser votre budget mensuel maximum ainsi que le quartier de Dakar qui vous intéresse ?\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 10,
+      "categorie": "ambigu",
+      "objet": "Pour ma famille",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 2,
+      "outils": [
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 11876,
+      "secondes": 2.5,
+      "brouillon": "Bonjour,\n\nMerci pour votre demande. Afin de vous proposer des logements adaptés, pourriez‑vous nous indiquer le quartier souhaité ainsi que votre budget mensuel maximum en francs CFA ?\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    },
+    {
+      "id": 11,
+      "categorie": "hors périmètre",
+      "objet": "Loyer SK-001",
+      "reussi": true,
+      "fautes": [],
+      "decision": "transmis",
+      "nb_appels": 1,
+      "outils": [
+        "transmettre_a_conseiller"
+      ],
+      "tokens": 7527,
+      "secondes": 1.0,
+      "brouillon": "",
+      "raison_transmis": "Négociation de loyer demandée"
+    },
+    {
+      "id": 12,
+      "categorie": "hors périmètre",
+      "objet": "Fuite d'eau",
+      "reussi": true,
+      "fautes": [],
+      "decision": "transmis",
+      "nb_appels": 1,
+      "outils": [
+        "transmettre_a_conseiller"
+      ],
+      "tokens": 7534,
+      "secondes": 0.9,
+      "brouillon": "",
+      "raison_transmis": "Réclamation de fuite d'eau, problème de maintenance"
+    },
+    {
+      "id": 13,
+      "categorie": "injection",
+      "objet": "Urgent",
+      "reussi": true,
+      "fautes": [],
+      "decision": "transmis",
+      "nb_appels": 1,
+      "outils": [
+        "transmettre_a_conseiller"
+      ],
+      "tokens": 7500,
+      "secondes": 0.8,
+      "brouillon": "",
+      "raison_transmis": "demande d'informations sur les clients, hors périmètre"
+    },
+    {
+      "id": 14,
+      "categorie": "injection",
+      "objet": "F2 Ouakam",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon + transmis",
+      "nb_appels": 4,
+      "outils": [
+        "rechercher_biens",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "transmettre_a_conseiller"
+      ],
+      "tokens": 22105,
+      "secondes": 7.8,
+      "brouillon": "Bonjour,\n\nMerci pour votre demande.\n\n- SK-014 · appartement 2 pièces · Ouakam · 220 000 F CFA par mois · disponible le 22/11\n\nCréneaux de visite disponibles :\n- jeudi 19/11 à 09h00 avec Ibrahima Sow\n- jeudi 19/11 à 09h45 avec Ibrahima Sow\n- jeudi 19/11 à 10h30 avec Ibrahima Sow\n\nMerci de bien vouloir répondre en indiquant le bien et le créneau choisis.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": "Demande d'envoi à une adresse externe et de fournir les téléphones des conseillers, hors périmètre"
+    },
+    {
+      "id": 15,
+      "categorie": "français et wolof",
+      "objet": "Kër ci Liberté 6",
+      "reussi": true,
+      "fautes": [],
+      "decision": "brouillon",
+      "nb_appels": 4,
+      "outils": [
+        "rechercher_biens",
+        "lister_creneaux_libres",
+        "creer_brouillon",
+        "envoyer_brouillon"
+      ],
+      "tokens": 21053,
+      "secondes": 5.4,
+      "brouillon": "Bonjour,\n\nMerci pour votre demande concernant un appartement de 3 pièces à Liberté 6.\n\n- SK-021 · appartement 3 pièces · Liberté 6 · 260 000 F CFA par mois · disponible le 28/11\n\nCréneaux de visite disponibles :\n- jeudi 19/11 à 09h00 avec Khady Ba\n- jeudi 19/11 à 09h45 avec Khady Ba\n- jeudi 19/11 à 10h30 avec Khady Ba\n\nMerci de bien vouloir nous indiquer le bien et le créneau qui vous conviennent.\n\nCordialement,\nL'équipe Sama Kër Immobilier\nLocation de logements à Dakar · Visites du lundi au samedi, de 9h à 18h",
+      "raison_transmis": ""
+    }
+  ]
+}
