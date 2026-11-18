@@ -105,9 +105,10 @@ Atelier-Sama-K-r-Immobilier/
 │   ├── resultats_ex1.json, resultats_ex2.json   scores obtenus (10/10)
 │   ├── emails_test.json     les 15 mails de test de l'exercice 6 et le résultat attendu de chacun
 │   ├── evaluer_pipeline.py  rejoue les 15 mails (sans rien envoyer) : réussite, outils, tokens, temps
+│   ├── analyser_echecs.py   prépare la fiche d'analyse des échecs (docs/analyse_echecs.md)
 │   ├── sauver_traces.py     garde la trace complète de quelques mails (traces/exemples/)
 │   └── resultats_ex6_avant.json, resultats_ex6_apres.json   résultats avant / après correction
-├── docs/                tests_serveur_mcp.md, schema_pipeline.md + captures/
+├── docs/                tests_serveur_mcp.md, schema_pipeline.md, analyse_echecs.md + captures/
 ├── traces/              cahiers de bord JSONL des essais ; traces/exemples/ : 3 traitements complets commentés
 ├── .env.example         modèle de configuration, sans aucun identifiant réel
 ├── .gitignore           liste des fichiers que Git ne doit jamais envoyer
@@ -594,7 +595,7 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 - [x] Résultat attendu pour chacun : biens, créneaux, décision de répondre ou de transmettre (Maimouna, champ `attendu`)
 - [x] Script qui rejoue le jeu et calcule taux de réussite, appels d'outils, tokens et temps par email (Atou, `evaluation/evaluer_pipeline.py`)
 - [x] Premier passage « avant » sur les 15 mails : 13/15 (Atou, `--etiquette avant`, 18 nov)
-- [x] Analyser trois cas avec leurs traces (Atou, voir [Évaluation complète](#évaluation-complète-exercice-6))
+- [x] Analyser trois cas avec leurs traces (Serigne Fallou, `evaluation/analyser_echecs.py` → `docs/analyse_echecs.md` ; résumé : [Évaluation complète](#évaluation-complète-exercice-6))
 - [x] Sauvegarder les traces de trois traitements complets, dont un échec (script : Maimouna, `evaluation/sauver_traces.py` ; passage : Atou → `traces/exemples/`)
 - [x] Corriger un échec, rejouer le jeu complet : 15/15 (Atou, branche C de `CONSIGNES_PIPELINE`, commit b0f8394, `--etiquette apres`)
 
@@ -603,7 +604,8 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 ### Finitions · 18 nov, 23h59 · 10 pts de qualité
 
 - [ ] Compléter toutes les parties `<À COMPLÉTER>` de ce README
-- [ ] Vérifier qu'aucun secret n'est sur GitHub
+- [x] Vérifier qu'aucun secret n'est sur GitHub (Serigne Fallou, 18 nov : aucun `.env`, `credentials.json`, `token.json` ni base dans tout l'historique Git ; aucune clé Groq ou Google dans le code)
+- [x] Fichier d'exemple de configuration sans aucun identifiant réel (Serigne Fallou, `.env.example`, ajout de `MCP_TRANSPORT`)
 - [ ] Cloner le dépôt dans un dossier vide et tout relancer avec ce README seul
 - [x] Traces de trois traitements complets dans `traces/exemples/`, dont un échec analysé (voir exercice 6)
 - [ ] Figer le dépôt et envoyer le lien à l'intervenant
