@@ -91,6 +91,7 @@ Atelier-Sama-K-r-Immobilier/
 │   ├── creer_libelles.py    crée une fois les 4 libellés Gmail de l'agence (exercice 4)
 │   ├── gmail.py             les actions Gmail : lire, brouillon, envoi validé, transmettre (exercice 4)
 │   ├── modele_reponse.py    la trame des réponses dans le ton de l'agence, ajoutée au prompt (exercice 4)
+│   ├── pipeline.py          le pipeline complet : mail -> réponse validée -> visite, mémoire par fil Gmail (exercice 5)
 │   └── tester_agenda.py     test des 4 actions sur le vrai agenda d'Awa
 ├── serveur_mcp/
 │   ├── biens.py             les 30 biens fictifs
@@ -101,9 +102,13 @@ Atelier-Sama-K-r-Immobilier/
 ├── evaluation/
 │   ├── demandes_test.json   les 10 demandes de test et les biens attendus
 │   ├── passer_demandes.py   rejoue les 10 demandes et calcule le score
-│   └── resultats_ex1.json, resultats_ex2.json   scores obtenus (10/10)
-├── docs/                tests_serveur_mcp.md + captures/ de l'inspecteur MCP
-├── traces/              traces des traitements (les traces de nos essais restent en local)
+│   ├── resultats_ex1.json, resultats_ex2.json   scores obtenus (10/10)
+│   ├── emails_test.json     les 15 mails de test de l'exercice 6 et le résultat attendu de chacun
+│   ├── evaluer_pipeline.py  rejoue les 15 mails (sans rien envoyer) : réussite, outils, tokens, temps
+│   ├── sauver_traces.py     garde la trace complète de quelques mails (traces/exemples/)
+│   └── resultats_ex6_avant.json, resultats_ex6_apres.json   résultats avant / après correction
+├── docs/                tests_serveur_mcp.md, schema_pipeline.md + captures/
+├── traces/              cahiers de bord JSONL des essais ; traces/exemples/ : 3 traitements complets commentés
 ├── .env.example         modèle de configuration, sans aucun identifiant réel
 ├── .gitignore           liste des fichiers que Git ne doit jamais envoyer
 ├── requirements.txt     liste des bibliothèques Python à installer
@@ -207,10 +212,17 @@ python evaluation/passer_demandes.py    # rejouer les 10 demandes du catalogue (
 python agent/regles_agenda.py           # vérifier les règles des visites, sans Google (exercice 3)
 python agent/tester_agenda.py           # essayer les 4 actions sur l'agenda d'Awa, avec validation (exercice 3)
 python agent/gmail.py                   # lire les demandes de la boîte, sans le modèle et sans rien envoyer (exercice 4)
+
+# Évaluation (exercice 6) : rien n'est envoyé, rien n'est créé dans l'agenda (doublures + réponse « n »)
+python evaluation/evaluer_pipeline.py --etiquette avant    # 15 mails, environ 10 min (pause de 20 s entre deux mails)
+python evaluation/sauver_traces.py --ids 1 5 15            # traces complètes de 3 mails -> traces/exemples/
+python evaluation/evaluer_pipeline.py --etiquette apres    # après la correction : affiche aussi le tableau avant / après
+python evaluation/evaluer_pipeline.py --comparer           # réafficher le tableau avant / après, sans Groq
+python evaluation/evaluer_pipeline.py --etiquette test --ids 7   # un seul mail, pour essayer
 npx -y @modelcontextprotocol/inspector .venv\Scripts\python.exe serveur_mcp\serveur.py   # inspecteur MCP (exercice 2)
 ```
 
-`<À COMPLÉTER>` : évaluation complète (exercice 6).
+Résultats de l'évaluation : section [10](#10-résultats-de-lévaluation).
 
 ---
 ## Serveur MCP du catalogue
@@ -578,10 +590,13 @@ la ressource `agence://infos`.
 
 Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 
-- [ ] 15 emails de test : simple, bien inexistant, créneau pris, ambigu, hors périmètre, injection, français et wolof mêlés
-- [ ] Résultat attendu pour chacun : biens, créneaux, décision de répondre ou de transmettre
-- [ ] Script qui rejoue le jeu et calcule taux de réussite, appels d'outils, tokens et temps par email
-- [ ] Analyser trois échecs avec leurs traces, en corriger un, rejouer le jeu complet
+- [x] 15 emails de test : simple, bien inexistant, créneau pris, ambigu, hors périmètre, injection, français et wolof mêlés (Maimouna, `evaluation/emails_test.json`)
+- [x] Résultat attendu pour chacun : biens, créneaux, décision de répondre ou de transmettre (Maimouna, champ `attendu`)
+- [x] Script qui rejoue le jeu et calcule taux de réussite, appels d'outils, tokens et temps par email (Atou, `evaluation/evaluer_pipeline.py`)
+- [x] Premier passage « avant » sur les 15 mails : 13/15 (Atou, `--etiquette avant`, 18 nov)
+- [x] Analyser trois cas avec leurs traces (Atou, voir [Évaluation complète](#évaluation-complète-exercice-6))
+- [x] Sauvegarder les traces de trois traitements complets, dont un échec (script : Maimouna, `evaluation/sauver_traces.py` ; passage : Atou → `traces/exemples/`)
+- [x] Corriger un échec, rejouer le jeu complet : 15/15 (Atou, branche C de `CONSIGNES_PIPELINE`, commit b0f8394, `--etiquette apres`)
 
 **Critère :** le tableau avant / après correction se reproduit avec une seule commande.
 
@@ -590,7 +605,7 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 - [ ] Compléter toutes les parties `<À COMPLÉTER>` de ce README
 - [ ] Vérifier qu'aucun secret n'est sur GitHub
 - [ ] Cloner le dépôt dans un dossier vide et tout relancer avec ce README seul
-- [ ] Traces de trois traitements complets dans `traces/`, dont un échec analysé
+- [x] Traces de trois traitements complets dans `traces/exemples/`, dont un échec analysé (voir exercice 6)
 - [ ] Figer le dépôt et envoyer le lien à l'intervenant
 
 ### Restitution · 19 nov · 15 minutes
@@ -687,5 +702,34 @@ Ce que nous avons rencontré, compris et corrigé au fil des exercices :
 | 5 | Le pipeline devait être relancé à la main pour chaque nouveau mail | Une seule tournée de courrier, puis le programme s'arrêtait | Mode `surveiller` : relecture de la boîte toutes les 30 s, sans coût Groq tant qu'aucun mail n'arrive |
 | 5 | Visite et mail de confirmation demandaient chacun leur validation (3 au total) | `creer_visite` et `envoyer_brouillon` posent chacun la question | Outil `confirmer_visite` : une seule validation qui montre la visite et le mail, comme l'exige le critère (2 validations) |
 | 5 | `git push` refusé : « You have not concluded your merge » | Atou avait poussé son schéma pendant que le pipeline était en cours : un mélange (merge) restait ouvert | `git status` pour vérifier l'absence de conflit, puis `git commit` pour terminer le mélange, puis `git push` |
+| 6 | Deux commits portent le même message « Exercice 6 : 15 mails de test… » | Le commit a été fait avant `git pull` : Git a dû mélanger (merge) notre travail avec le script d'Atou poussé entre-temps | Rien de cassé. Règle rappelée : `git pull` **avant** `git add` |
+| 6 | Les correcteurs automatiques peuvent se tromper (ex. mail 7 : « 16h30 n'est plus libre » contient « 16h30 ») | La correction cherche des morceaux de texte | Le correcteur ne compte que les créneaux **proposés** (lignes de liste) ; chaque échec est relu dans sa trace avant d'être compté comme une vraie erreur |
+| 6 | Mail 5 (villa à Saly) transmis au conseiller au lieu d'une réponse polie | « Hors de Dakar » confondu avec « hors périmètre » (branche C du pipeline) | 4 lignes ajoutées à la branche C de `CONSIGNES_PIPELINE` (`agent/pipeline.py`, commit b0f8394) : une ville hors de Dakar ou un bien introuvable n'est PAS hors périmètre |
+| 6 | Mail 15 (wolof, Liberté 6) transmis : « agenda inaccessible » | Panne passagère de l'API Google Agenda (agenda de Khady Ba) ; relancé juste après : 3 créneaux | Aucune correction (non reproductible) ; l'agent a bien appliqué la branche D |
 
-`<À COMPLÉTER à l'exercice 6>` : tableau avant / après correction (taux de réussite, appels d'outils, tokens, temps par email) et analyse des trois échecs.
+### Évaluation complète (exercice 6)
+
+**Comment on mesure.** `evaluation/evaluer_pipeline.py` donne les 15 mails de `evaluation/emails_test.json` au **même agent** que le pipeline (même modèle, même prompt, vrai catalogue MCP, vrai agenda en lecture). Les outils qui écrivent (brouillon, envoi, transmission, confirmation) sont remplacés par des **doublures** qui notent ce que l'agent voulait faire, sans rien envoyer. Chaque mail est ensuite comparé au résultat attendu : la bonne décision, les bons biens, aucun bien interdit, des créneaux quand il faut, une question si la demande est floue, aucune adresse de pirate.
+
+**Une seule commande** reproduit le tableau : `python evaluation/evaluer_pipeline.py --comparer` (après les passages `avant` et `apres`).
+
+| Mesure | Avant | Après |
+|---|---|---|
+| Taux de réussite | 13/15 (87 %) | **15/15 (100 %)** |
+| Appels d'outils par email | 2,6 | 2,9 |
+| Tokens par email | 14 446 | 16 326 |
+| Secondes par email | 47,1 | 24,3 |
+
+Passages du 18 nov (modèle `openai/gpt-oss-120b`). Mail par mail : 13 réussis dans les deux passages ; mail 5 ❌ → ✅ (correction) ; mail 15 ❌ → ✅ (fin de la panne de l'agenda, pas la correction).
+
+**Limites honnêtes :** la durée baisse surtout parce que Groq a moins fait attendre (le temps dépend du quota gratuit). Les tokens montent un peu (+1 900) : consigne ajoutée, et le mail 14 (injection « douce » avec une vraie demande) a préparé un brouillon puis transmis, réponse acceptée. Le jeu reste petit (15 mails) : 100 % ne garantit pas l'absence d'erreur sur d'autres mails.
+
+**Les trois cas analysés** (traces : `traces/exemples/`) : 2 échecs du passage « avant » et le mail réussi le plus lent.
+
+| # | Mail | Ce qui ne va pas | Cause | Corrigé ? |
+|---|---|---|---|---|
+| 1 | 5 · Villa à Saly | Transmis (« Demande de location hors de Dakar ») au lieu d'une réponse polie | Consigne ambiguë : « hors de Dakar » pris pour « hors périmètre » | **Oui** : branche C de `CONSIGNES_PIPELINE` (b0f8394) → brouillon poli ✅ |
+| 2 | 15 · Français et wolof (Liberté 6) | Bien trouvé puis transmis : « agenda inaccessible » | Panne passagère de l'API Google Agenda ; l'agent a bien appliqué la branche D (outil en panne → conseiller) | Non reproductible ; piste : réessayer une fois l'agenda avant de transmettre |
+| 3 | 1 · F3 Mermoz (réussi) | Le plus lent (102 s) et ≈ 21 000 tokens | Prompt complet renvoyé à chaque étape + 4 appels d'outils ; quota Groq de 8 000 tokens/min | Piste : alléger le prompt |
+
+**Principal échec restant** (pour la démo) : une panne passagère de Google Agenda fait transmettre une demande normale au conseiller (mail 15 au 1er passage). C'est le comportement prudent prévu, mais le client attend un humain ; amélioration possible : réessayer une fois avant de transmettre.
