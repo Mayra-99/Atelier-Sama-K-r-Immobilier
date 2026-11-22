@@ -17,7 +17,9 @@ Le serveur expose :
 
 Lancement, depuis la racine du dépôt :
     python serveur_mcp/serveur.py          # transport local (stdio)
-    python serveur_mcp/serveur.py http     # transport HTTP sur http://127.0.0.1:8000/mcp
+    python serveur_mcp/serveur.py http     # transport HTTP sur http://127.0.0.1:8000/mcp (ce PC seulement)
+    python serveur_mcp/serveur.py reseau   # HTTP ouvert au réseau Wi-Fi : http://<IP du PC>:8000/mcp
+                                           # (pour qu'une autre équipe branche son agent ; voir README)
 
 Prérequis : la base doit exister (python serveur_mcp/creer_catalogue.py)
 et le paquet mcp en version 1 (pip install "mcp<2"), car en version 2
@@ -39,8 +41,14 @@ MAX_RESULTATS = (
     5  # on ne renvoie pas tout le catalogue : la réponse reste légère pour le modèle
 )
 
+# Mode « reseau » : on écoute sur toutes les cartes réseau (0.0.0.0) pour que les PC du même
+# Wi-Fi puissent se brancher. Sinon, seulement ce PC (127.0.0.1), avec la protection de FastMCP
+# qui refuse les connexions venues d'ailleurs.
+MODE_RESEAU = len(sys.argv) > 1 and sys.argv[1] == "reseau"
+HOTE = "0.0.0.0" if MODE_RESEAU else "127.0.0.1"
+
 # On crée le serveur et on lui donne un nom (visible dans l'inspecteur MCP)
-mcp = FastMCP("catalogue-sama-ker")
+mcp = FastMCP("catalogue-sama-ker", host=HOTE, port=8000)
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +218,12 @@ except ImportError:
 # Démarrage du serveur
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "http":
+    if MODE_RESEAU:
+        # HTTP ouvert au réseau : les autres équipes utilisent http://<IP de ce PC>:8000/mcp
+        print("Serveur MCP ouvert au réseau sur le port 8000. Adresse à donner : http://<votre IP>:8000/mcp")
+        print("(trouver l'IP : commande ipconfig, ligne « Adresse IPv4 »). Ctrl+C pour arrêter.")
+        mcp.run(transport="streamable-http")
+    elif len(sys.argv) > 1 and sys.argv[1] == "http":
         # HTTP : le serveur écoute sur http://127.0.0.1:8000/mcp (voir MCP_URL dans .env)
         mcp.run(transport="streamable-http")
     else:
