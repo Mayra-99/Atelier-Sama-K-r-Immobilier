@@ -126,6 +126,13 @@ def _creneau_pris(id_agenda: str, debut: datetime, sauf: Optional[str] = None) -
 # ---------------------------------------------------------------------------
 # 2. La validation humaine (e3e)
 # ---------------------------------------------------------------------------
+# Où part la question « Valider ? » :
+#   False (par défaut) -> dans le terminal, avec input()  (main.py, tests, évaluation de l'exercice 6)
+#   True               -> au POSTE DU CONSEILLER (page web), avec interrupt() de LangGraph.
+#                         C'est pipeline.py qui le met à True quand on le lance avec « interface ».
+MODE_INTERFACE = False
+
+
 def demander_validation(resume: str) -> bool:
     """
     L'agent S'ARRÊTE et montre au conseiller ce qu'il va faire. Seul « o » (oui) laisse passer.
@@ -133,6 +140,15 @@ def demander_validation(resume: str) -> bool:
     À l'exercice 5, cette fonction pourra être remplacée (ex. bouton, ou interruption LangGraph)
     sans toucher aux 4 actions.
     """
+    if MODE_INTERFACE:
+        # IMAGE : la secrétaire met le dossier en PAUSE dans le classeur (le checkpoint SQLite)
+        # avec un post-it « à valider ». Le programme ne reste PAS bloqué : il passe au mail suivant.
+        # Quand le conseiller clique sur un bouton, pipeline.py relance ce dossier avec
+        # Command(resume="o" ou "n") et c'est ici que la réponse revient.
+        from langgraph.types import interrupt
+        reponse = interrupt({"resume": resume})
+        return str(reponse).strip().lower() in ("o", "oui", "y", "yes")
+
     print("\n" + "=" * 60)
     print("VALIDATION DU CONSEILLER REQUISE")
     print(resume)

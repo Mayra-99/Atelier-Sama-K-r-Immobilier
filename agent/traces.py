@@ -76,6 +76,10 @@ class CahierDeBord(BaseCallbackHandler):
     # 3. L'outil a planté : on note l'erreur (utile pour l'exercice 6).
     def on_tool_error(self, error, *, run_id, **kwargs):
         self.debuts.pop(run_id, None)
+        if type(error).__name__ == "GraphInterrupt":
+            # (22 nov, may) Pas une panne : interrupt() met le dossier en pause pour le conseiller
+            self._noter({"type": "pause", "raison": "en attente du conseiller (poste du conseiller)"})
+            return
         self._noter({"type": "erreur_outil", "erreur": repr(error)})
 
     # 4. Le modèle a fini de parler : on note les tokens consommés si dispo.
