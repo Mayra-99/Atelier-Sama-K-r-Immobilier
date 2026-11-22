@@ -4,7 +4,7 @@ Agent IA qui traite de bout en bout les demandes de visite de l'agence de locati
 
 Activité pratique « Agents IA » · Programme Data & IA, Orange Digital Center · Sonatel Academy P1 IA, groupe 3 · Novembre 2026
 
-Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il faut faire de A à Z (cases à cocher), comment installer et lancer le projet, et comment l'équipe travaille. Les parties marquées `<À COMPLÉTER>` sont remplies au fil des exercices.
+Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il faut faire de A à Z (cases à cocher), comment installer et lancer le projet, et comment l'équipe travaille. Il a été rempli au fil des exercices : chaque section dit qui a fait quoi, ce qui a été testé et les résultats obtenus.
 
 ## Sommaire
 
@@ -14,6 +14,10 @@ Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il 
 4. [Contenu du dépôt](#4-contenu-du-dépôt)
 5. [Installation (Windows)](#5-installation-windows)
 6. [Lancement](#6-lancement)
+   - [Serveur MCP du catalogue](#serveur-mcp-du-catalogue) (exercice 2)
+   - [Agenda des conseillers](#agenda-des-conseillers-exercice-3) (exercice 3)
+   - [Boîte de l'agence](#boîte-de-lagence-exercice-4) (exercice 4)
+   - [Pipeline complet](#pipeline-complet-exercice-5) (exercice 5)
 7. [Travail à faire, de A à Z](#7-travail-à-faire-de-a-à-z)
 8. [Méthode de travail de l'équipe](#8-méthode-de-travail-de-léquipe)
 9. [Sécurité](#9-sécurité)
@@ -68,7 +72,7 @@ L'agent ne touche jamais directement aux données : il passe par le serveur MCP 
 | Brique | Notre choix | Pourquoi |
 |---|---|---|
 | Modèle | Groq, palier gratuit (`openai/gpt-oss-120b`) | L'énoncé impose un usage gratuit ; appel d'outils natif ; déjà utilisé dans notre projet RAG |
-| Framework d'agent | LangGraph | Open source ; pause pour la validation humaine (`interrupt`) et sauvegarde de l'état (checkpoints) intégrées |
+| Framework d'agent | LangGraph (`create_react_agent`) | Open source ; boucle ReAct prête à l'emploi (réfléchir → appeler un outil → observer) ; sauvegarde de l'état de chaque conversation intégrée (checkpoint SQLite, exercice 5) |
 | Catalogue | SQLite + serveur MCP (FastMCP) | Imposé par l'énoncé |
 | Agenda et messagerie | API Google Calendar et Gmail, compte de test | Imposé par l'énoncé |
 | Validation humaine | Ligne de commande : le conseiller tape `o` ou `n` (`demander_validation` dans `agent/agenda.py`) | Simple et sûr : seul `o` laisse passer ; remplaçable plus tard sans toucher aux outils |
@@ -96,7 +100,7 @@ Atelier-Sama-K-r-Immobilier/
 ├── serveur_mcp/
 │   ├── biens.py             les 30 biens fictifs
 │   ├── creer_catalogue.py   crée la base SQLite catalogue.db (non envoyée sur GitHub)
-│   ├── serveur.py           serveur MCP : outils rechercher_biens, detail_bien (stdio ou http)
+│   ├── serveur.py           serveur MCP : outils rechercher_biens, detail_bien (stdio, http ou reseau)
 │   ├── ressource_agence.py  ressource agence://infos (horaires, quartiers, conditions)
 │   └── verifier_ressource.py  petit client de test du serveur
 ├── evaluation/
@@ -206,7 +210,8 @@ python agent/pipeline.py                # une seule tournée de courrier, puis s
 # Pour travailler
 python agent/main.py                    # discuter avec l'agent ; il lance lui-même le serveur MCP (exercices 1 à 5)
                                         #   variante HTTP : lancer d'abord le serveur en http, puis dans .env : MCP_TRANSPORT=http
-python serveur_mcp/serveur.py http      # serveur MCP seul, en HTTP, pour l'inspecteur ou une autre équipe (exercice 2)
+python serveur_mcp/serveur.py http      # serveur MCP seul, en HTTP sur ce PC, pour l'inspecteur (exercice 2)
+python serveur_mcp/serveur.py reseau    # serveur MCP ouvert au réseau Wi-Fi, pour une autre équipe (exercice 2)
 
 # Pour tester
 python evaluation/passer_demandes.py    # rejouer les 10 demandes du catalogue (exercices 1 et 2)
@@ -235,7 +240,8 @@ Le serveur `serveur_mcp/serveur.py` est le **guichet du catalogue** : n'importe 
 ```
 python serveur_mcp/creer_catalogue.py     # une fois : crée la base catalogue.db (30 biens)
 python serveur_mcp/serveur.py             # transport stdio : l'agent lance le serveur lui-même
-python serveur_mcp/serveur.py http        # transport HTTP : http://127.0.0.1:8000/mcp
+python serveur_mcp/serveur.py http        # transport HTTP : http://127.0.0.1:8000/mcp (ce PC seulement)
+python serveur_mcp/serveur.py reseau      # transport HTTP ouvert au Wi-Fi : http://<IP du PC>:8000/mcp (autre équipe)
 ```
 
 ### Outils (actions que le modèle peut appeler)
@@ -285,15 +291,57 @@ En cas de base absente ou illisible, les deux outils renvoient `{"erreur": "Cata
 
 Vérification rapide avec notre client de test : `python serveur_mcp/verifier_ressource.py` (liste les outils et la ressource, puis lit `agence://infos`).
 
-Depuis un agent LangGraph, avec `langchain-mcp-adapters` :
-```python
-from langchain_mcp_adapters.client import MultiServerMCPClient
+#### Procédure pas à pas : une autre équipe branche son agent sur notre serveur
 
-client = MultiServerMCPClient({
-    "catalogue": {"url": "http://127.0.0.1:8000/mcp", "transport": "streamable_http"}
-})
-outils = await client.get_tools()   # -> rechercher_biens, detail_bien
-```
+**Image simple :** notre serveur MCP est le guichet du catalogue. D'habitude, le guichet est fermé à clé et seul notre PC peut s'en servir (`127.0.0.1`). Pour le test, on ouvre la porte sur le Wi-Fi de la classe, on donne l'adresse à l'autre équipe, puis on referme.
+
+**Ce qu'il faut :** les deux ordinateurs sur **le même réseau** (même Wi-Fi, ou le partage de connexion d'un téléphone si le Wi-Fi de la classe bloque les échanges entre PC), et notre dépôt à jour (`git pull`).
+
+**Côté Sama Kër (notre PC)**
+
+1. Ouvrir PowerShell dans le dossier du dépôt, activer l'environnement : `.venv\Scripts\Activate.ps1`
+2. Vérifier que la base existe : `python serveur_mcp/creer_catalogue.py` (sans danger si on le relance).
+3. Lancer le serveur ouvert au réseau :
+   ```
+   python serveur_mcp/serveur.py reseau
+   ```
+   Le terminal affiche `Serveur MCP ouvert au réseau sur le port 8000` et `Uvicorn running on http://0.0.0.0:8000`. **Laisser cette fenêtre ouverte.**
+4. Si Windows affiche « Autoriser l'accès » (pare-feu) : cocher **Réseaux privés** et accepter.
+5. Dans une **deuxième** fenêtre PowerShell : `ipconfig`, puis noter la ligne **Adresse IPv4** de la carte Wi-Fi (ex. `192.168.1.25`).
+6. Donner à l'autre équipe l'adresse complète : `http://192.168.1.25:8000/mcp` (avec notre IP) et **ce README** (section « Serveur MCP du catalogue » : outils, arguments, exemples).
+
+**Côté autre équipe (leur PC)**
+
+7. Test rapide avec l'inspecteur MCP : `npx -y @modelcontextprotocol/inspector`, puis dans la page qui s'ouvre : Transport **Streamable HTTP**, URL `http://192.168.1.25:8000/mcp`, **Connect**. Ils doivent voir les 2 outils (`rechercher_biens`, `detail_bien`) et la ressource `agence://infos`.
+8. Puis depuis leur agent (exemple LangGraph avec `langchain-mcp-adapters`) :
+   ```python
+   from langchain_mcp_adapters.client import MultiServerMCPClient
+
+   client = MultiServerMCPClient({
+       "catalogue": {"url": "http://192.168.1.25:8000/mcp", "transport": "streamable_http"}
+   })
+   outils = await client.get_tools()   # -> rechercher_biens, detail_bien
+   ```
+   Un autre framework fait pareil : il suffit d'un client MCP en « Streamable HTTP » avec cette URL.
+9. Ils posent une question à leur agent, par exemple « un F3 à Mermoz à moins de 400 000 F » : la réponse doit citer **SK-001** (350 000 F). Pour un bien qui n'existe pas (« SK-999 »), l'outil répond une erreur claire, sans rien inventer.
+
+**Vérification et fin (notre PC)**
+
+10. Dans notre fenêtre du serveur, chaque appel de l'autre équipe s'affiche (`INFO: <leur IP> - "POST /mcp HTTP/1.1" 200 OK`) : c'est la **preuve** que leur agent utilise notre catalogue. Faire une capture d'écran des deux côtés et la mettre dans `docs/captures/`.
+11. **Ctrl+C** dans la fenêtre du serveur pour refermer la porte.
+12. Noter le résultat dans la section 10 (équipe, outil ou framework utilisé, question posée, réponse obtenue) et cocher la case de l'exercice 2.
+
+**Si ça ne marche pas**
+
+| Ce qu'on voit | Cause probable | Que faire |
+|---|---|---|
+| Chez eux : délai dépassé (« timeout ») | Pas sur le même réseau, ou le pare-feu bloque | Vérifier le Wi-Fi des deux PC ; autoriser Python dans le pare-feu (réseaux privés) ; essayer le partage de connexion d'un téléphone |
+| Chez eux : « connexion refusée », et notre terminal affiche `Uvicorn running on http://127.0.0.1:8000` | Serveur lancé avec `http` au lieu de `reseau` (il n'écoute que ce PC) | Ctrl+C puis `python serveur_mcp/serveur.py reseau` : la ligne doit dire `0.0.0.0` |
+| Chez nous : `address already in use` (port 8000) | Un autre serveur tourne déjà | Fermer l'autre fenêtre du serveur, puis relancer |
+| Chez eux : `Catalogue inaccessible` | La base `catalogue.db` n'existe pas chez nous | `python serveur_mcp/creer_catalogue.py`, puis relancer le serveur |
+| Chez eux : 404 | URL sans `/mcp` à la fin | Utiliser `http://<IP>:8000/mcp` |
+
+**Pourquoi un mode à part ?** Par défaut, le serveur n'écoute que sur ce PC (`127.0.0.1`) et FastMCP refuse les connexions venues d'ailleurs (protection contre le « DNS rebinding »). Le mode `reseau` ouvre volontairement le port 8000 à tout le Wi-Fi (`0.0.0.0`) : seulement le temps du test. Le catalogue est fictif et le serveur ne fait que **lire** : aucun risque pour nos données, aucun accès à Gmail ni à l'agenda.
 
 ## Agenda des conseillers (exercice 3)
 
@@ -524,6 +572,7 @@ Pilote : Serigne Fallou · Copilote : Atou · Vérificateur : Maimouna
 - [x] Captures et compte rendu des tests : [docs/tests_serveur_mcp.md](docs/tests_serveur_mcp.md)
 - [x] Rejouer les 10 demandes de l'exercice 1 via MCP et retrouver les mêmes résultats
 - [x] Documenter le serveur dans ce README : outils, arguments, exemples d'appel
+- [ ] Une autre équipe branche son agent sur notre serveur (`python serveur_mcp/serveur.py reseau`, [procédure pas à pas](#procédure-pas-à-pas--une-autre-équipe-branche-son-agent-sur-notre-serveur))
 
 **Critère :** les dix demandes de l'exercice 1 donnent les mêmes résultats, et une autre équipe branche son agent sur notre serveur avec notre seule documentation.
 
@@ -601,9 +650,9 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 
 **Critère :** le tableau avant / après correction se reproduit avec une seule commande.
 
-### Finitions · 18 nov, 23h59 · 10 pts de qualité
+### Finitions · dépôt figé le 22 nov, 23h · 10 pts de qualité
 
-- [ ] Compléter toutes les parties `<À COMPLÉTER>` de ce README
+- [x] Compléter toutes les parties `<À COMPLÉTER>` de ce README
 - [x] Vérifier qu'aucun secret n'est sur GitHub (Serigne Fallou, 18 nov : aucun `.env`, `credentials.json`, `token.json` ni base dans tout l'historique Git ; aucune clé Groq ou Google dans le code)
 - [x] Fichier d'exemple de configuration sans aucun identifiant réel (Serigne Fallou, `.env.example`, ajout de `MCP_TRANSPORT`)
 - [ ] Cloner le dépôt dans un dossier vide et tout relancer avec ce README seul
@@ -686,6 +735,7 @@ Ce que nous avons rencontré, compris et corrigé au fil des exercices :
 | 1 | « Saint-Louis » : l'agent demandait un quartier | Le prompt ne disait pas que l'agence ne couvre que Dakar | Prompt corrigé : « l'agence ne loue qu'à Dakar » |
 | 1 | Erreur 429 de Groq pendant les tests | Quota gratuit (environ 8 000 tokens par minute) dépassé à cause des relances | Pauses entre les demandes dans le script de test |
 | 2 | `FastMCP` introuvable | `mcp` version 2 a renommé FastMCP | Version épinglée : `mcp<2` |
+| 2 | Une autre équipe ne pouvait pas se brancher sur notre serveur HTTP | Le serveur n'écoutait que sur `127.0.0.1` (ce PC) et FastMCP refuse les connexions d'ailleurs (protection « DNS rebinding ») ; changer l'hôte après coup ne suffit pas, il faut le donner à la création | Mode `python serveur_mcp/serveur.py reseau` : `FastMCP(..., host="0.0.0.0", port=8000)`, testé depuis une autre adresse IP (Maimouna, 22 nov) |
 | 2 | L'inspecteur MCP ne démarrait pas (Node 20), puis npm cassé après l'installation de Node 26 par-dessus | Version de Node trop ancienne, puis mélange de deux versions de npm | Désinstallation, suppression de `C:\Program Files\nodejs`, installation propre de Node 22 ; client MCP Python de secours écrit entre-temps |
 | 2 | 10/10, mais la demande « SK-999 » répondait « catalogue momentanément indisponible » | Le prompt confondait « bien introuvable » et « panne » | Prompt corrigé. Leçon : **un score ne suffit pas, il faut lire les réponses** (les traces l'ont montré) |
 | 3 | `Activate.ps1` refusé sur la machine de la classe | Exécution de scripts bloquée par Windows | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` (seulement la fenêtre ouverte) |
