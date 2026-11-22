@@ -24,6 +24,9 @@ LES DEUX VALIDATIONS DU CONSEILLER (critère du jury) :
 Lancement, depuis la racine du dépôt (venv activé, token.json avec Gmail + agenda) :
     python agent/pipeline.py              # traite les nouveaux mails, une fois
     python agent/pipeline.py surveiller   # reste allumé et regarde la boîte toutes les 30 s (démo)
+    python agent/pipeline.py interface    # comme « surveiller », mais les validations se font
+                                          # sur le POSTE DU CONSEILLER (page web), sans bloquer
+                                          # (2e fenêtre : streamlit run agent/poste_conseiller.py)
 Pour la démo : lancer en mode « surveiller ». Le jury écrit -> proposition (validation 1) ;
 le jury répond avec un créneau -> visite + confirmation (validation 2). Sans relancer.
 """
@@ -38,8 +41,10 @@ from langchain_core.tools import tool
 from langchain_groq import ChatGroq
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.prebuilt import create_react_agent
+from langgraph.types import Command
 
 import agenda  # module d'Atou (on y touche pour la validation unique)
+import decisions  # boîte aux lettres entre le poste du conseiller et l'agent (may)
 import gmail  # module de may
 from agenda import lister_creneaux_libres, deplacer_visite, annuler_visite, creer_visite
 from gmail import (
@@ -49,7 +54,7 @@ from gmail import (
     lire_demandes,
     consignes_emails,
 )
-from main import BOUCLE, MODELE, RACINE, charger_outils_mcp, consignes_visites, repondre
+from main import BOUCLE, MODELE, NB_MAX_ETAPES, RACINE, charger_outils_mcp, consignes_visites, repondre
 from prompt_systeme import PROMPT_SYSTEME  # fiche de poste + modèle de réponse (Fallou)
 from regles_agenda import en_texte  # « jeudi 19/11 à 15h00 » (may)
 from traces import CahierDeBord  # cahier de bord (Atou)
@@ -72,6 +77,13 @@ def _validation_deja_donnee():
         yield
     finally:
         agenda.demander_validation, gmail.demander_validation = anciennes
+
+
+def _destinataire(id_message: str) -> str:
+    """L'adresse du client, lue dans son mail (même règle que creer_brouillon : jamais le modèle)."""
+    origine = gmail._google().users().messages().get(
+        userId="me", id=id_message, format="metadata", metadataHeaders=["From", "Reply-To"]).execute()
+    return parseaddr(gmail._entete(origine, "Reply-To") or gmail._entete(origine, "From"))[1]
 
 
 @tool
@@ -131,24 +143,32 @@ def confirmer_visite(
             "conseil": "Transmettre à un conseiller.",
         }
 
-    # b) Le mail de confirmation est préparé en brouillon (il ne part pas encore)
-    brouillon = creer_brouillon.func(id_message, texte_confirmation)
-    if "erreur" in brouillon:
-        return brouillon
-
-    # c) LA validation : le conseiller voit la visite ET le mail, et dit oui ou non une seule fois
+    # b) LA validation : le conseiller voit la visite ET le mail, et dit oui ou non une seule fois.
+    #    (22 nov, may) Elle se fait AVANT de créer le brouillon. Pourquoi ? Avec interrupt(), quand
+    #    le conseiller répond, LangGraph RELANCE l'outil depuis le début : tout ce qui est écrit
+    #    avant la question serait refait (2 brouillons). Avant la question : seulement des LECTURES.
+    #    Bonus : les vérifications a) sont refaites au moment de la réponse (créneau encore libre ?).
+    try:
+        destinataire = _destinataire(id_message)
+    except Exception as e:
+        return {"erreur": f"Mail {id_message} introuvable : {e}",
+                "conseil": "Utiliser l'id_message du mail de confirmation."}
     accord = agenda.demander_validation(
         f"CONFIRMER LA VISITE et ENVOYER LA CONFIRMATION\n"
         f"  Bien : {bien['id']} · {bien['adresse']}\n"
         f"  Client : {client}\n  Conseiller : {nom}\n  Quand : {en_texte(moment)} (45 min)\n"
-        f"  Mail à : {brouillon['destinataire']}\n---\n{texte_confirmation.strip()}\n---"
+        f"  Mail à : {destinataire}\n---\n{texte_confirmation.strip()}\n---"
     )
     if not accord:
         return {
             "statut": "refusé",
-            "message": "Le conseiller n'a pas validé : aucune visite créée, aucun "
-            "mail envoyé. Le brouillon reste dans Gmail.",
+            "message": "Le conseiller n'a pas validé : aucune visite créée, aucun mail envoyé.",
         }
+
+    # c) Le mail de confirmation est préparé en brouillon (le texte exact que le conseiller a vu)
+    brouillon = creer_brouillon.func(id_message, texte_confirmation)
+    if "erreur" in brouillon:
+        return brouillon
 
     # d) On exécute les deux actions avec l'accord déjà donné
     with _validation_deja_donnee():
@@ -277,6 +297,11 @@ def traiter_nouveaux_mails(agent, cahier: CahierDeBord, nombre: int = 3) -> list
     for d in lecture.get("demandes", []):
         fil = id_du_fil(d["id_message"])
         client = parseaddr(d["expediteur"])[0] or d["expediteur"]
+        if question_en_attente(agent, f"gmail-{fil}"):
+            # Le client réécrit alors que son dossier attend le conseiller : on ne mélange pas.
+            # Le mail reste « À traiter » ; il sera lu après la décision du conseiller.
+            print(f"\n--- Mail de {client} : son dossier attend le conseiller, on le garde pour après.")
+            continue
         print(f"\n--- Mail de {client} · « {d['objet']} » · dossier gmail-{fil}")
         consigne = (
             f"Nouveau mail reçu dans le fil Gmail {fil}.\n"
@@ -284,12 +309,71 @@ def traiter_nouveaux_mails(agent, cahier: CahierDeBord, nombre: int = 3) -> list
             f"{d['texte']}\n\n{lecture['attention']}\nTraite ce mail selon la procédure du pipeline."
         )
         # 2. e5d : même fil Gmail = même dossier = l'agent se souvient de ce qu'il a proposé
+        debut = len(cahier.evenements)
         resume = repondre(agent, consigne, cahier, id_conversation=f"gmail-{fil}")
+        # Garde-fou (22 nov, may) : le modèle crée parfois le brouillon puis s'arrête SANS appeler
+        # envoyer_brouillon. Le brouillon ne serait jamais montré au conseiller et le fil resterait
+        # coincé dans « En attente ». Le CODE le voit dans le cahier de bord et le rappelle UNE fois.
+        outils = [e["outil"] for e in cahier.evenements[debut:] if e["type"] == "appel_outil"]
+        if ("creer_brouillon" in outils and "envoyer_brouillon" not in outils
+                and "transmettre_a_conseiller" not in outils
+                and not question_en_attente(agent, f"gmail-{fil}")):
+            print("   ↺ brouillon créé mais pas soumis au conseiller : rappel à l'agent")
+            resume = repondre(agent, "Tu as créé un brouillon sans appeler envoyer_brouillon. Appelle "
+                              "maintenant envoyer_brouillon avec l'id_brouillon renvoyé par creer_brouillon : "
+                              "c'est cet outil qui demande l'accord du conseiller. Ne crée pas d'autre brouillon.",
+                              cahier, id_conversation=f"gmail-{fil}")
+        if question_en_attente(agent, f"gmail-{fil}"):
+            resume = "⏸ dossier en pause : il attend la décision du conseiller sur son poste."
         print(f"Agent > {resume}")
         bilan.append(
             {"fil": fil, "client": client, "objet": d["objet"], "resultat": resume}
         )
     return bilan
+
+
+# ---------------------------------------------------------------------------
+# 4. (22 nov, may) Validation NON BLOQUANTE avec interrupt() et le poste du conseiller
+# ---------------------------------------------------------------------------
+def question_en_attente(agent, id_conversation: str):
+    """Le post-it « à valider » de ce dossier, ou None s'il n'est pas en pause."""
+    etat = BOUCLE.run_until_complete(
+        agent.aget_state({"configurable": {"thread_id": id_conversation}}))
+    return etat.interrupts[0] if etat.interrupts else None
+
+
+def appliquer_decisions(agent, cahier: CahierDeBord) -> int:
+    """L'agent relève la boîte aux lettres et relance chaque dossier décidé par le conseiller."""
+    faites = 0
+    for d in decisions.a_appliquer():
+        question = question_en_attente(agent, d["fil"])
+        if question is None or question.id != d["id_question"]:
+            # Sécurité : on ne relance que la question EXACTE que le conseiller a vue
+            decisions.marquer_appliquee(d["id_question"], "ignorée : le dossier a changé entre-temps")
+            continue
+        print(f"\n--- Décision de {d['conseiller']} pour le dossier {d['fil']} : "
+              f"{'✅ validé' if d['reponse'] == 'o' else '✋ refusé'}")
+        config = {"configurable": {"thread_id": d["fil"]},
+                  "recursion_limit": NB_MAX_ETAPES * 2 + 1, "callbacks": [cahier]}
+        try:
+            # Command(resume=...) : la réponse revient dans interrupt(), l'outil finit son travail,
+            # puis le modèle écrit sa phrase finale (comme si le conseiller avait tapé o/n)
+            resultat = BOUCLE.run_until_complete(agent.ainvoke(Command(resume=d["reponse"]), config))
+            phrase = resultat["messages"][-1].content
+        except Exception as e:                                   # 429 Groq, garde-fou, panne...
+            phrase = f"reprise impossible : {e}"
+        if question_en_attente(agent, d["fil"]):
+            phrase = "⏸ une nouvelle question attend le conseiller."
+        elif d["reponse"] != "o":
+            # Refus = le conseiller reprend la main : le fil quitte « En attente » (plus de fil oublié)
+            try:
+                gmail._ranger(d["fil"].removeprefix("gmail-"), "transmis")
+            except Exception as e:
+                phrase += f" (rangement Gmail impossible : {e})"
+        decisions.marquer_appliquee(d["id_question"], phrase)
+        print(f"Agent > {phrase}")
+        faites += 1
+    return faites
 
 
 if __name__ == "__main__":
@@ -299,23 +383,31 @@ if __name__ == "__main__":
     #                                            la boîte toutes les 30 secondes (Ctrl+C pour arrêter)
     import time
 
-    surveiller = len(sys.argv) > 1 and sys.argv[1] == "surveiller"
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+    surveiller = mode in ("surveiller", "interface")
+    agenda.MODE_INTERFACE = mode == "interface"   # les validations partent au poste du conseiller
     agent, connexion = construire_agent_pipeline()
     cahier = CahierDeBord()
     print(
         f"Pipeline Sama Kër (modèle {MODELE}). Mémoire : {CHEMIN_MEMOIRE.relative_to(RACINE)} · "
         f"Trace : traces/{cahier.chemin.name}"
     )
+    if agenda.MODE_INTERFACE:
+        print("Validations : sur le poste du conseiller (streamlit run agent/poste_conseiller.py)")
     try:
+        tour = 0
         while True:
-            bilan = traiter_nouveaux_mails(agent, cahier)
-            print(f"\nTournée terminée : {len(bilan)} mail(s) traité(s).")
-            if not surveiller:
-                break
-            print("J'attends les prochains mails (Ctrl+C pour arrêter)...")
-            time.sleep(
-                30
-            )  # lire la boîte ne coûte rien chez Groq : seul un VRAI mail réveille le modèle
+            if agenda.MODE_INTERFACE:
+                decisions.signe_de_vie()             # « je suis à mon poste » (pour la page)
+                appliquer_decisions(agent, cahier)   # toutes les 5 s : les clics du conseiller
+            if tour % 6 == 0:                        # toutes les 30 s : la boîte mail
+                bilan = traiter_nouveaux_mails(agent, cahier)
+                print(f"\nTournée terminée : {len(bilan)} mail(s) traité(s).")
+                if not surveiller:
+                    break
+                print("J'attends les prochains mails (Ctrl+C pour arrêter)...")
+            tour += 1
+            time.sleep(5)  # lire la boîte ne coûte rien chez Groq : seul un VRAI mail réveille le modèle
     except KeyboardInterrupt:
         print("\nArrêt demandé.")
     finally:
