@@ -18,6 +18,7 @@ Ce README est le **document unique** du projet : il décrit l'atelier, ce qu'il 
    - [Agenda des conseillers](#agenda-des-conseillers-exercice-3) (exercice 3)
    - [Boîte de l'agence](#boîte-de-lagence-exercice-4) (exercice 4)
    - [Pipeline complet](#pipeline-complet-exercice-5) (exercice 5)
+   - [Poste du conseiller](#poste-du-conseiller-validation-non-bloquante) (validation non bloquante, 22 nov)
 7. [Travail à faire, de A à Z](#7-travail-à-faire-de-a-à-z)
 8. [Méthode de travail de l'équipe](#8-méthode-de-travail-de-léquipe)
 9. [Sécurité](#9-sécurité)
@@ -63,19 +64,19 @@ flowchart LR
     A --> M[Serveur MCP<br/>catalogue des biens]
     A --> G[Google Calendar<br/>créneaux, visites]
     A --> E[Gmail<br/>lecture, brouillons, envoi]
-    A -- accord requis --> V[Validation<br/>par un conseiller]
+    A -- accord requis --> V[Validation<br/>poste du conseiller<br/>page web]
     A --> T[Traces et journal]
 ```
 
-L'agent ne touche jamais directement aux données : il passe par le serveur MCP pour le catalogue, par Google Calendar pour les créneaux et par Gmail pour les messages. Avant chaque envoi ou écriture dans l'agenda, il s'arrête et attend l'accord d'un conseiller. Chaque étape est enregistrée dans les traces.
+L'agent ne touche jamais directement aux données : il passe par le serveur MCP pour le catalogue, par Google Calendar pour les créneaux et par Gmail pour les messages. Avant chaque envoi ou écriture dans l'agenda, il met le dossier **en pause** et attend l'accord d'un conseiller, sans bloquer les autres clients (`interrupt()` de LangGraph et page web du conseiller). Chaque étape est enregistrée dans les traces.
 
 | Brique | Notre choix | Pourquoi |
 |---|---|---|
 | Modèle | Groq, palier gratuit (`openai/gpt-oss-120b`) | L'énoncé impose un usage gratuit ; appel d'outils natif ; déjà utilisé dans notre projet RAG |
-| Framework d'agent | LangGraph (`create_react_agent`) | Open source ; boucle ReAct prête à l'emploi (réfléchir → appeler un outil → observer) ; sauvegarde de l'état de chaque conversation intégrée (checkpoint SQLite, exercice 5) |
+| Framework d'agent | LangGraph (`create_react_agent`) | Open source ; boucle ReAct prête à l'emploi (réfléchir → appeler un outil → observer) ; sauvegarde de l'état de chaque conversation intégrée (checkpoint SQLite, exercice 5) ; mise en pause d'un dossier avec `interrupt()` et reprise avec `Command(resume=...)` (22 nov) |
 | Catalogue | SQLite + serveur MCP (FastMCP) | Imposé par l'énoncé |
 | Agenda et messagerie | API Google Calendar et Gmail, compte de test | Imposé par l'énoncé |
-| Validation humaine | Ligne de commande : le conseiller tape `o` ou `n` (`demander_validation` dans `agent/agenda.py`) | Simple et sûr : seul `o` laisse passer ; remplaçable plus tard sans toucher aux outils |
+| Validation humaine | **Pipeline (démo)** : page web Streamlit du conseiller, boutons ✅ / ✋, dossier mis en pause par `interrupt()` (`agent/poste_conseiller.py`). **Tests et `main.py`** : ligne de commande `o` / `n` | Le conseiller n'utilise pas un terminal ; l'agent n'attend jamais ; seul un « oui » explicite laisse passer. Les 4 actions n'ont pas changé : seule `demander_validation` (dans `agent/agenda.py`) choisit où part la question |
 
 ---
 
@@ -95,7 +96,10 @@ Atelier-Sama-K-r-Immobilier/
 │   ├── creer_libelles.py    crée une fois les 4 libellés Gmail de l'agence (exercice 4)
 │   ├── gmail.py             les actions Gmail : lire, brouillon, envoi validé, transmettre (exercice 4)
 │   ├── modele_reponse.py    la trame des réponses dans le ton de l'agence, ajoutée au prompt (exercice 4)
-│   ├── pipeline.py          le pipeline complet : mail -> réponse validée -> visite, mémoire par fil Gmail (exercice 5)
+│   ├── pipeline.py          le pipeline complet : mail -> réponse validée -> visite, mémoire par fil Gmail (exercice 5) ;
+│   │                        mode « interface » : validations non bloquantes (interrupt) relancées par le conseiller
+│   ├── decisions.py         boîte aux lettres entre la page du conseiller et l'agent + lecture Gmail pour le tableau de bord
+│   ├── poste_conseiller.py  page web du conseiller (Streamlit) : valider / refuser, tableau de bord, dossiers bloqués
 │   └── tester_agenda.py     test des 4 actions sur le vrai agenda d'Awa
 ├── serveur_mcp/
 │   ├── biens.py             les 30 biens fictifs
@@ -206,6 +210,10 @@ python agent/creer_libelles.py          # 4 libellés Gmail (exercice 4) : DÉJ�
 # Le pipeline complet (exercice 5) : c'est la commande de la démo
 python agent/pipeline.py surveiller     # reste allumé, regarde la boîte toutes les 30 s ; Ctrl+C pour arrêter
 python agent/pipeline.py                # une seule tournée de courrier, puis s'arrête
+
+# La démo avec le POSTE DU CONSEILLER (validations non bloquantes) : 2 fenêtres
+python agent/pipeline.py interface           # fenêtre 1 : l'agent (comme « surveiller », sans jamais attendre)
+streamlit run agent/poste_conseiller.py      # fenêtre 2 : la page du conseiller -> http://localhost:8501
 
 # Pour travailler
 python agent/main.py                    # discuter avec l'agent ; il lance lui-même le serveur MCP (exercices 1 à 5)
@@ -416,6 +424,8 @@ Valider ? (o/n) >
 
 Seul `o` laisse passer ; toute autre réponse est un refus et rien n'est écrit dans l'agenda. Lire l'agenda ne demande pas de validation : c'est sans risque.
 
+Depuis le 22 nov, la même question peut partir sur le **poste du conseiller** au lieu du terminal (voir [Poste du conseiller](#poste-du-conseiller-validation-non-bloquante)) : un seul aiguillage `MODE_INTERFACE` dans `demander_validation`, les 4 actions n'ont pas changé.
+
 ### Aucun doublon
 
 Deux protections :
@@ -529,12 +539,81 @@ flowchart TD
 
 `python agent/pipeline.py surveiller` reste allumé et relit la boîte toutes les 30 secondes. Lire la boîte ne coûte rien chez Groq : seul un vrai mail réveille le modèle. Pendant la démo, on ne relance donc rien entre les deux mails du jury : c'est le « aucune autre intervention » du critère.
 
-**Déroulé de la démo :** lancer le mode surveiller → le jury écrit à la boîte de l'agence → validation 1 → le jury clique sur **Répondre** et choisit un créneau → validation 2 → la visite apparaît dans l'agenda et la confirmation arrive chez le jury.
+**Déroulé de la démo :** depuis le 22 nov, on lance plutôt le mode `interface` avec le poste du conseiller (section suivante) : même déroulé, mais les validations se font en cliquant sur la page. Version terminal : lancer le mode surveiller → le jury écrit à la boîte de l'agence → validation 1 → le jury clique sur **Répondre** et choisit un créneau → validation 2 → la visite apparaît dans l'agenda et la confirmation arrive chez le jury.
 
 ### Limites connues
 
 - La mémoire est rangée **par fil Gmail**, comme le demande l'énoncé : si le client écrit un **nouveau** mail au lieu de cliquer sur « Répondre », l'agent repart d'un dossier vide. Il ne crée jamais de visite au hasard : il refait une proposition ou pose une question.
 - Quand le client répond, Gmail recopie l'ancien échange sous sa réponse : quelques tokens de plus (le mail reste coupé à 1 200 caractères).
+
+## Poste du conseiller (validation non bloquante)
+
+Ajouté le 22 nov (Maimouna). **Le problème :** avec `input()`, l'agent restait bloqué devant la question « Valider ? (o/n) » : les autres clients attendaient, et un Ctrl+C ou un « n » laissait le fil coincé pour toujours dans « SK/En attente de validation » (`lire_demandes` ne le relit plus). Un conseiller n'utilise pas non plus un terminal.
+
+**Image simple :** la secrétaire ne reste plus debout devant le bureau du conseiller. Elle range le dossier **en pause dans le classeur** (le checkpoint SQLite), avec un post-it « à valider », et passe au client suivant. Le conseiller voit les post-its sur sa page et clique. La secrétaire relève les décisions toutes les 5 secondes et reprend chaque dossier **exactement là où elle l'avait laissé**.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Agent as Agent (pipeline.py interface)
+    participant Classeur as Classeur<br/>conversations.sqlite
+    participant Boite as Boîte aux lettres<br/>decisions.sqlite
+    participant Page as Poste du conseiller<br/>(page web)
+    Client->>Agent: mail
+    Agent->>Agent: rechercher_biens, lister_creneaux_libres, creer_brouillon
+    Agent->>Classeur: envoyer_brouillon -> interrupt() : dossier EN PAUSE
+    Note over Agent: passe au mail suivant (n'attend pas)
+    Page->>Classeur: lit les dossiers en pause (toutes les 5 s)
+    Page->>Boite: le conseiller clique ✅ (signé de son nom)
+    Agent->>Boite: relève la boîte (toutes les 5 s)
+    Agent->>Classeur: Command(resume="o") : l'outil reprend
+    Agent->>Client: le mail part (fil -> SK/Répondu)
+```
+
+![Poste du conseiller (données fictives)](docs/captures/poste_conseiller.png)
+
+### Lancer
+
+```
+python agent/pipeline.py interface           # fenêtre 1 : l'agent
+streamlit run agent/poste_conseiller.py      # fenêtre 2 : la page -> http://localhost:8501
+```
+
+On peut fermer la page ou arrêter l'agent (Ctrl+C) à tout moment : les dossiers en pause restent dans le classeur et réapparaissent au redémarrage. Les deux bases sont dans `checkpoints/`, ignoré par Git. `main.py`, `tester_agenda.py` et l'évaluation de l'exercice 6 gardent la question dans le terminal : `interrupt()` a besoin d'un agent LangGraph et de quelqu'un pour relancer le dossier, et l'évaluation répond automatiquement « n » à `input()`.
+
+### Ce que fait chaque bouton
+
+| Bouton | Ce qui se passe |
+|---|---|
+| ✅ Valider | l'agent relance le dossier avec `Command(resume="o")` : le mail part (ou la visite est créée et la confirmation part) |
+| ✋ Refuser, je m'en occupe | `Command(resume="n")` : rien ne part, le fil passe dans « SK/Transmis à un conseiller », le brouillon reste dans Gmail pour le conseiller |
+| 👤 Je m'en occupe (dossier bloqué) | le fil passe dans « Transmis », le brouillon est gardé |
+| 🔁 Faire retraiter (dossier bloqué) | vieux brouillon supprimé, libellés retirés, mémoire du fil vidée : l'agent relit le mail au tour suivant et repart de zéro |
+
+### Les sécurités
+
+- **On valide exactement ce qui a été affiché** : la décision porte le numéro de la question (`interrupt.id`) ; si le dossier a changé entre-temps, elle est ignorée.
+- **Pas de double exécution** : un double clic sur la même question est ignoré.
+- **Trace** : chaque décision est enregistrée avec le nom du conseiller, l'heure, ce qu'il a vu et ce que l'agent a fait ensuite (historique en bas de la page).
+- **Pas de refus automatique** : un dossier attend le conseiller ; pastilles 🟠 après 2 h, 🔴 après 24 h.
+- **Le client réécrit pendant la pause** : son mail est gardé pour après la décision, on ne mélange pas deux demandes.
+- **Le piège de la reprise** : quand le conseiller répond, LangGraph **relance l'outil depuis le début**. Tout ce qui écrit quelque chose avant la question serait refait. Dans `confirmer_visite`, la question est donc posée **avant** de créer le brouillon (avant : seulement des lectures). Bonus : les vérifications sont refaites au moment du clic (créneau encore libre ?).
+
+### Le tableau de bord
+
+| Compteur | Ce qu'il dit |
+|---|---|
+| 🤖 Agent actif / arrêté | l'agent écrit un signe de vie à chaque tour ; s'il est arrêté, les clics attendront qu'il redémarre |
+| ⏸ À valider | la charge du conseiller, avec l'heure du dossier le plus ancien |
+| ⚠️ Bloqués | fils « En attente » sans question en cours chez l'agent : **doit rester à 0** (sinon un client attend une réponse que personne n'enverra) |
+| ✅ Répondus, 👤 Transmis | fils du jour |
+| taux de validation du jour | qualité des brouillons de l'agent : beaucoup de refus = revoir le prompt |
+
+Tous ces chiffres viennent des libellés Gmail et des deux bases SQLite : **aucun token Groq**.
+
+### Résultat du test réel (22 nov)
+
+Test sur la vraie boîte de test et Groq (Maimouna) : mise en pause sans bloquer l'agent (il continue ses tournées), ✅ depuis la page (mail envoyé, fil dans « SK/Répondu »), 🔁 sur un dossier bloqué, compteur « agent actif » ; 7 propositions validées dans la journée (100 %). Les 10 anciens fils coincés de l'époque `input()` sont apparus dans « Dossiers bloqués ».
 
 ## 7. Travail à faire, de A à Z
 
@@ -655,6 +734,7 @@ Pilote : Atou · Copilote : Maimouna · Vérificateur : Serigne Fallou
 - [x] Compléter toutes les parties `<À COMPLÉTER>` de ce README
 - [x] Vérifier qu'aucun secret n'est sur GitHub (Serigne Fallou, 18 nov : aucun `.env`, `credentials.json`, `token.json` ni base dans tout l'historique Git ; aucune clé Groq ou Google dans le code)
 - [x] Fichier d'exemple de configuration sans aucun identifiant réel (Serigne Fallou, `.env.example`, ajout de `MCP_TRANSPORT`)
+- [x] Validation humaine non bloquante (`interrupt()` LangGraph) et poste du conseiller : page web, tableau de bord, dossiers bloqués (Maimouna, 22 nov)
 - [ ] Cloner le dépôt dans un dossier vide et tout relancer avec ce README seul
 - [x] Traces de trois traitements complets dans `traces/exemples/`, dont un échec analysé (voir exercice 6)
 - [ ] Figer le dépôt et envoyer le lien à l'intervenant
@@ -758,6 +838,12 @@ Ce que nous avons rencontré, compris et corrigé au fil des exercices :
 | 6 | Les correcteurs automatiques peuvent se tromper (ex. mail 7 : « 16h30 n'est plus libre » contient « 16h30 ») | La correction cherche des morceaux de texte | Le correcteur ne compte que les créneaux **proposés** (lignes de liste) ; chaque échec est relu dans sa trace avant d'être compté comme une vraie erreur |
 | 6 | Mail 5 (villa à Saly) transmis au conseiller au lieu d'une réponse polie | « Hors de Dakar » confondu avec « hors périmètre » (branche C du pipeline) | 4 lignes ajoutées à la branche C de `CONSIGNES_PIPELINE` (`agent/pipeline.py`, commit b0f8394) : une ville hors de Dakar ou un bien introuvable n'est PAS hors périmètre |
 | 6 | Mail 15 (wolof, Liberté 6) transmis : « agenda inaccessible » | Panne passagère de l'API Google Agenda (agenda de Khady Ba) ; relancé juste après : 3 créneaux | Aucune correction (non reproductible) ; l'agent a bien appliqué la branche D |
+| Finitions | Le pipeline disait « Aucune nouvelle demande » alors que des clients attendaient | 7 fils restés dans « SK/En attente de validation » après un « n » ou un Ctrl+C pendant `input()` : `lire_demandes` saute ces fils, par sécurité | Validation non bloquante : `interrupt()` met le dossier en pause dans le checkpoint SQLite, le conseiller décide sur une page web, `Command(resume)` reprend le dossier (22 nov) |
+| Finitions | Erreur de conception de notre part : à l'exercice 5, le README annonçait `interrupt` alors que le code utilisait `input()` | `interrupt()` n'avait pas été proposé alors que le checkpoint était déjà en place | README corrigé le 22 nov au matin, puis `interrupt()` réellement intégré l'après-midi |
+| Finitions | Avec `interrupt()`, `confirmer_visite` aurait créé 2 brouillons | À la reprise, LangGraph relance l'outil depuis le début : ce qui est écrit avant la question est refait | La question est posée avant de créer le brouillon ; avant elle, seulement des lectures |
+| Finitions | Rien n'apparaissait sur la page pour un mail pourtant traité | Le modèle avait créé le brouillon puis s'était arrêté sans appeler `envoyer_brouillon` (« prêt à être envoyé après validation ») : pas d'appel, pas de question, fil coincé | Garde-fou dans le code : si le cahier de bord montre un brouillon sans `envoyer_brouillon`, l'agent est rappelé UNE fois |
+| Finitions | Après suppression d'un brouillon à la main, l'agent voulait encore l'envoyer (« brouillon introuvable », puis transmis) | La mémoire du fil se souvenait de l'identifiant du brouillon supprimé | Bouton 🔁 « Faire retraiter » : supprime le brouillon ET vide la mémoire du fil (`delete_thread`) |
+| Finitions | Chaque mise en pause apparaissait comme une erreur ✗ dans le terminal | `interrupt()` lève une exception technique (`GraphInterrupt`) que le cahier de bord prenait pour une panne | `traces.py` note « pause : en attente du conseiller » |
 
 ### Évaluation complète (exercice 6)
 
